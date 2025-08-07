@@ -1,0 +1,143 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { LayoutDashboard, Building2, CreditCard, MessageSquare, Mail, Menu, X, Moon, Sun } from 'lucide-react';
+import { useCompany } from '@/contexts/CompanyContext';
+import { CompanySelector } from '../components/CompanySelector';
+
+const navigation = [
+    { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Payments', href: '/dashboard/payments', icon: CreditCard },
+    { name: 'Discord', href: '/dashboard/discord', icon: MessageSquare },
+    { name: 'Support', href: '/dashboard/support', icon: Mail },
+];
+
+function useDarkMode() {
+    const [isDark, setIsDark] = useState(false);
+
+    useEffect(() => {
+        // On mount, check localStorage or system preference
+        const stored = localStorage.getItem('theme');
+        if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            setIsDark(true);
+        } else {
+            document.documentElement.classList.remove('dark');
+            setIsDark(false);
+        }
+    }, []);
+
+    const toggle = () => {
+        setIsDark((prev) => {
+            const next = !prev;
+            if (next) {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            }
+            return next;
+        });
+    };
+
+    return [isDark, toggle] as const;
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const pathname = usePathname();
+    const { selectedCompany } = useCompany();
+    const [isDark, toggleDark] = useDarkMode();
+
+    return (
+        <div className='min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90'>
+            {/* Mobile sidebar */}
+            <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? '' : 'hidden'}`}>
+                <div className='fixed inset-0 bg-black/60 backdrop-blur-sm' onClick={() => setSidebarOpen(false)} />
+                <div className='fixed inset-y-0 left-0 flex w-64 flex-col border-r border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
+                    <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
+                        <span className='text-xl font-semibold tracking-tight text-foreground'>Dashboard</span>
+                        <button onClick={() => setSidebarOpen(false)} className='text-foreground/70 hover:text-foreground'>
+                            <X className='h-6 w-6' />
+                        </button>
+                    </div>
+                    <div className='flex-1 space-y-1 px-2 py-4'>
+                        <div className='px-2 pb-4'>
+                            <CompanySelector />
+                        </div>
+                        {navigation.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={item.href}
+                                    className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'border border-primary/20 bg-primary/10 text-primary'
+                                            : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                                    }`}>
+                                    <item.icon className='mr-3 h-6 w-6' />
+                                    {item.name}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Desktop sidebar */}
+            <div className='hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col'>
+                <div className='flex min-h-0 flex-1 flex-col border-r border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
+                    <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
+                        <span className='text-xl font-semibold tracking-tight text-foreground'>Dashboard</span>
+                        <button onClick={toggleDark} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground'>
+                            {isDark ? <Sun className='h-5 w-5' /> : <Moon className='h-5 w-5' />}
+                        </button>
+                    </div>
+                    <div className='flex-1 space-y-1 px-2 py-4'>
+                        <div className='px-2 pb-4'>
+                            <CompanySelector />
+                        </div>
+                        {navigation.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={item.href}
+                                    className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'border border-primary/20 bg-primary/10 text-primary'
+                                            : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                                    }`}>
+                                    <item.icon className='mr-3 h-6 w-6' />
+                                    {item.name}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            {/* Main content */}
+            <div className='lg:pl-64'>
+                {/* Top header */}
+                <div className='sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-gradient-to-br from-background via-background/95 to-background/90 px-4 shadow-sm backdrop-blur-sm'>
+                    <button onClick={() => setSidebarOpen(true)} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
+                        <Menu className='h-6 w-6' />
+                    </button>
+                    <div className='flex items-center gap-4'>
+                        <button onClick={toggleDark} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
+                            {isDark ? <Sun className='h-5 w-5' /> : <Moon className='h-5 w-5' />}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Page content */}
+                <main className='p-6'>{children}</main>
+            </div>
+        </div>
+    );
+}
