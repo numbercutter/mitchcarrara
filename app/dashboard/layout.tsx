@@ -4,14 +4,19 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Building2, CreditCard, MessageSquare, Mail, Menu, X, Moon, Sun } from 'lucide-react';
-import { useCompany } from '@/contexts/CompanyContext';
+import { CompanyProvider } from '@/contexts/CompanyContext';
 import { CompanySelector } from '../components/CompanySelector';
 
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Payments', href: '/dashboard/payments', icon: CreditCard },
-    { name: 'Discord', href: '/dashboard/discord', icon: MessageSquare },
-    { name: 'Support', href: '/dashboard/support', icon: Mail },
+    { name: 'Companies', href: '/dashboard/companies', icon: Building2, 
+      children: [
+        { name: 'Overview', href: '/dashboard/companies', icon: LayoutDashboard },
+        { name: 'Payments', href: '/dashboard/companies/payments', icon: CreditCard },
+        { name: 'Discord', href: '/dashboard/companies/discord', icon: MessageSquare },
+        { name: 'Support', href: '/dashboard/companies/support', icon: Mail },
+      ]
+    },
 ];
 
 function useDarkMode() {
@@ -49,11 +54,11 @@ function useDarkMode() {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const pathname = usePathname();
-    const { selectedCompany } = useCompany();
     const [isDark, toggleDark] = useDarkMode();
+    const isCompaniesRoute = pathname.startsWith('/dashboard/companies');
 
-    return (
-        <div className='min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90'>
+    const sidebarContent = (
+        <>
             {/* Mobile sidebar */}
             <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? '' : 'hidden'}`}>
                 <div className='fixed inset-0 bg-black/60 backdrop-blur-sm' onClick={() => setSidebarOpen(false)} />
@@ -65,23 +70,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </button>
                     </div>
                     <div className='flex-1 space-y-1 px-2 py-4'>
-                        <div className='px-2 pb-4'>
-                            <CompanySelector />
-                        </div>
+                        {isCompaniesRoute && (
+                            <div className='px-2 pb-4'>
+                                <CompanySelector />
+                            </div>
+                        )}
                         {navigation.map((item) => {
                             const isActive = pathname === item.href;
+                            const hasChildren = item.children && item.children.length > 0;
+                            const isChildActive = hasChildren && item.children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
+                            const showChildren = hasChildren && (isActive || isChildActive || pathname.startsWith(item.href + '/'));
+                            
                             return (
-                                <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                        isActive
-                                            ? 'border border-primary/20 bg-primary/10 text-primary'
-                                            : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
-                                    }`}>
-                                    <item.icon className='mr-3 h-6 w-6' />
-                                    {item.name}
-                                </Link>
+                                <div key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                            isActive || isChildActive
+                                                ? 'border border-primary/20 bg-primary/10 text-primary'
+                                                : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                                        }`}>
+                                        <item.icon className='mr-3 h-6 w-6' />
+                                        {item.name}
+                                    </Link>
+                                    {showChildren && (
+                                        <div className='ml-6 mt-1 space-y-1'>
+                                            {item.children.map((child) => {
+                                                const isChildItemActive = pathname === child.href;
+                                                return (
+                                                    <Link
+                                                        key={child.name}
+                                                        href={child.href}
+                                                        className={`group flex items-center rounded-md px-2 py-1 text-sm transition-colors ${
+                                                            isChildItemActive
+                                                                ? 'bg-primary/5 text-primary'
+                                                                : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
+                                                        }`}>
+                                                        <child.icon className='mr-3 h-4 w-4' />
+                                                        {child.name}
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
@@ -98,28 +130,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </button>
                     </div>
                     <div className='flex-1 space-y-1 px-2 py-4'>
-                        <div className='px-2 pb-4'>
-                            <CompanySelector />
-                        </div>
+                        {isCompaniesRoute && (
+                            <div className='px-2 pb-4'>
+                                <CompanySelector />
+                            </div>
+                        )}
                         {navigation.map((item) => {
                             const isActive = pathname === item.href;
+                            const hasChildren = item.children && item.children.length > 0;
+                            const isChildActive = hasChildren && item.children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
+                            const showChildren = hasChildren && (isActive || isChildActive || pathname.startsWith(item.href + '/'));
+                            
                             return (
-                                <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                        isActive
-                                            ? 'border border-primary/20 bg-primary/10 text-primary'
-                                            : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
-                                    }`}>
-                                    <item.icon className='mr-3 h-6 w-6' />
-                                    {item.name}
-                                </Link>
+                                <div key={item.name}>
+                                    <Link
+                                        href={item.href}
+                                        className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                            isActive || isChildActive
+                                                ? 'border border-primary/20 bg-primary/10 text-primary'
+                                                : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                                        }`}>
+                                        <item.icon className='mr-3 h-6 w-6' />
+                                        {item.name}
+                                    </Link>
+                                    {showChildren && (
+                                        <div className='ml-6 mt-1 space-y-1'>
+                                            {item.children.map((child) => {
+                                                const isChildItemActive = pathname === child.href;
+                                                return (
+                                                    <Link
+                                                        key={child.name}
+                                                        href={child.href}
+                                                        className={`group flex items-center rounded-md px-2 py-1 text-sm transition-colors ${
+                                                            isChildItemActive
+                                                                ? 'bg-primary/5 text-primary'
+                                                                : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
+                                                        }`}>
+                                                        <child.icon className='mr-3 h-4 w-4' />
+                                                        {child.name}
+                                                    </Link>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
                 </div>
             </div>
+        </>
+    );
+
+    const mainContent = (
+        <>
+            {sidebarContent}
 
             {/* Main content */}
             <div className='lg:pl-64'>
@@ -138,6 +203,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Page content */}
                 <main className='p-6'>{children}</main>
             </div>
+        </>
+    );
+
+    return (
+        <div className='min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90'>
+            {isCompaniesRoute ? (
+                <CompanyProvider>{mainContent}</CompanyProvider>
+            ) : (
+                mainContent
+            )}
         </div>
     );
 }
