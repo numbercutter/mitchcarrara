@@ -3,12 +3,31 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building2, CreditCard, MessageSquare, Mail, Menu, X, Moon, Sun } from 'lucide-react';
+import { LayoutDashboard, Building2, CreditCard, MessageSquare, Mail, Menu, X, Moon, Sun, Eye, Heart, CheckSquare, Calendar, Settings, Dumbbell, Book, BarChart, Users, FileText, Shield, Clock } from 'lucide-react';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { CompanySelector } from '../components/CompanySelector';
+import ChatSidebar from '../components/ChatSidebar';
 
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Vision Board', href: '/dashboard/vision', icon: Eye },
+    { name: 'Personal', href: '/dashboard/personal', icon: Heart,
+      children: [
+        { name: 'Overview', href: '/dashboard/personal', icon: LayoutDashboard },
+        { name: 'Health & Fitness', href: '/dashboard/personal/health', icon: Dumbbell },
+        { name: 'Contacts', href: '/dashboard/personal/contacts', icon: Users },
+        { name: 'Routines', href: '/dashboard/personal/routines', icon: Clock },
+        { name: 'Documents', href: '/dashboard/personal/documents', icon: Shield },
+        { name: 'Analytics', href: '/dashboard/personal/analytics', icon: BarChart },
+      ]
+    },
+    { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare,
+      children: [
+        { name: 'Overview', href: '/dashboard/tasks', icon: LayoutDashboard },
+        { name: 'Manage Tasks', href: '/dashboard/tasks/manage', icon: CheckSquare },
+        { name: 'Calendar', href: '/dashboard/tasks/calendar', icon: Calendar },
+      ]
+    },
     { name: 'Companies', href: '/dashboard/companies', icon: Building2, 
       children: [
         { name: 'Overview', href: '/dashboard/companies', icon: LayoutDashboard },
@@ -53,6 +72,7 @@ function useDarkMode() {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
     const pathname = usePathname();
     const [isDark, toggleDark] = useDarkMode();
     const isCompaniesRoute = pathname.startsWith('/dashboard/companies');
@@ -187,13 +207,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {sidebarContent}
 
             {/* Main content */}
-            <div className='lg:pl-64'>
+            <div className={`transition-all duration-300 lg:pl-64 ${chatSidebarOpen ? 'lg:pr-80' : ''}`}>
                 {/* Top header */}
                 <div className='sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-gradient-to-br from-background via-background/95 to-background/90 px-4 shadow-sm backdrop-blur-sm'>
                     <button onClick={() => setSidebarOpen(true)} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
                         <Menu className='h-6 w-6' />
                     </button>
                     <div className='flex items-center gap-4'>
+                        <button 
+                            onClick={() => setChatSidebarOpen(!chatSidebarOpen)} 
+                            className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground transition-colors'
+                            title="Toggle Chat"
+                        >
+                            <MessageSquare className='h-5 w-5' />
+                        </button>
                         <button onClick={toggleDark} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
                             {isDark ? <Sun className='h-5 w-5' /> : <Moon className='h-5 w-5' />}
                         </button>
@@ -203,6 +230,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Page content */}
                 <main className='p-6'>{children}</main>
             </div>
+
+            {/* Chat Sidebar */}
+            <ChatSidebar 
+                isOpen={chatSidebarOpen} 
+                onToggle={() => setChatSidebarOpen(!chatSidebarOpen)} 
+            />
         </>
     );
 

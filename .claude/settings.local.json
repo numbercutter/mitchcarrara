@@ -5,7 +5,8 @@
       "Bash(move discord companies )",
       "Bash(move payments companies )",
       "Bash(move support companies)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
