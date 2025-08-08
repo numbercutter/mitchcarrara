@@ -14,8 +14,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-    title: 'Torpal',
-    description: 'Multi-company support dashboard',
+    title: 'mitchcarrara',
+    description: 'Personal portfolio dashboard for Mitch Carrara',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

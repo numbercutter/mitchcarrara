@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Torpal** is a multi-company support dashboard built with Next.js 14, TypeScript, and Tailwind CSS. It helps manage multiple companies and their integrations with third-party services including Stripe payments, Discord analytics, and email campaigns.
+**mitchcarrara** is a personal portfolio dashboard built with Next.js 14, TypeScript, and Tailwind CSS. It helps manage multiple companies and their integrations with third-party services including Stripe payments, Discord analytics, and email campaigns.
 
 ## Development Commands
 
@@ -35,6 +35,7 @@ bun run cleanup-courses    # Clean up course data
 ## Architecture
 
 ### Tech Stack
+
 - **Framework**: Next.js 14 with App Router
 - **Runtime**: Bun (preferred) or Node.js
 - **Database**: Supabase
@@ -86,7 +87,8 @@ config/              # Configuration files
 
 **Styling System**: Uses Tailwind with CSS variables for theming. Dark mode is implemented with class-based toggling. Custom color palette defined in `tailwind.config.js`.
 
-**Component Architecture**: 
+**Component Architecture**:
+
 - Page components in `app/dashboard/`
 - Reusable UI components in `components/ui/`
 - Business logic components in `app/components/`
@@ -119,13 +121,15 @@ RESEND_API_KEY=
 
 **Code Formatting**: Prettier is configured with import sorting. Use `bun run format` before committing.
 
-**Component Patterns**: 
+**Component Patterns**:
+
 - Use `'use client'` directive for client components
 - Leverage React Query for data fetching
 - Use CompanyContext for multi-company state
 - Follow Tailwind utility-first approach
 
 **API Integration**:
+
 - External service integrations go in `app/api/`
 - Use Supabase client in `lib/supabase/` for database operations
 - Webhook handlers for Stripe payments in `app/api/payments/`
