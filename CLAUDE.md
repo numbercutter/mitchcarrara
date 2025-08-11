@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**mitchcarrara** is a personal portfolio dashboard built with Next.js 14, TypeScript, and Tailwind CSS. It helps manage multiple companies and their integrations with third-party services including Stripe payments, Discord analytics, and email campaigns.
+**mitchcarrara** is a personal portfolio dashboard built with Next.js 14, TypeScript, and Tailwind CSS. It manages multiple companies and their integrations with third-party services including Stripe payments, Discord analytics, and email campaigns.
 
 ## Development Commands
 
@@ -21,6 +21,7 @@ bun run start           # Start production server
 bun run lint            # Run ESLint
 bun run format          # Format code with Prettier
 bun run format:check    # Check formatting without changes
+bun run remove-unused   # Remove unused imports
 
 # Stripe integration (when working with payments)
 bun run stripe:login    # Login to Stripe CLI
@@ -40,10 +41,12 @@ bun run cleanup-courses    # Clean up course data
 - **Runtime**: Bun (preferred) or Node.js
 - **Database**: Supabase
 - **Authentication**: Supabase Auth
-- **State Management**: React Query (@tanstack/react-query) + React Context
+- **State Management**: React Query (@tanstack/react-query) + Zustand + React Context
 - **Styling**: Tailwind CSS with CSS variables for theming
 - **Payments**: Stripe
 - **UI Components**: Custom components with Radix UI primitives
+- **Charts**: Recharts
+- **Animations**: Motion (Framer Motion)
 
 ### Project Structure
 
@@ -54,84 +57,89 @@ app/                    # Next.js App Router
 │   ├── discord/       # Discord API integration
 │   └── payments/      # Stripe payment webhooks
 ├── dashboard/         # Protected dashboard pages
-│   ├── discord/       # Discord analytics
-│   ├── payments/      # Payment analytics
-│   └── support/       # Support management
+│   ├── companies/     # Company management pages
+│   ├── personal/      # Personal management (analytics, contacts, health)
+│   ├── tasks/         # Task management system
+│   └── vision/        # Vision/goals page
 ├── login/            # Authentication pages
 ├── components/       # Page-specific components
 ├── contexts/         # React Context providers
 └── lib/             # Utilities and configurations
 
 components/           # Reusable UI components
-├── ui/              # Base UI components (Button, Card, etc.)
+├── ui/              # Base UI components (Button, Card, Progress, etc.)
 └── ChatWidget.tsx   # Global chat widget
 
 lib/                 # Utilities and configurations
-├── supabase/        # Supabase client configurations
+├── supabase/        # Supabase client configurations (client, server, middleware)
 └── utils.ts         # Utility functions
 
 contexts/            # React Context providers
 └── CompanyContext.tsx  # Multi-company state management
 
 config/              # Configuration files
-└── companies.ts     # Company configuration
+└── companies.ts     # Company configuration with 8 companies
 ```
 
 ### Key Architecture Patterns
 
-**Multi-Company Architecture**: The app uses a CompanyContext to manage multiple company configurations. Each company has its own Stripe, Discord, and other service configurations defined in `config/companies.ts`.
+**Multi-Company Architecture**: The app uses a CompanyContext to manage 8 different company configurations (RTHMN, SeconDisc, Reality Designers, Protocoding, Best2DayEv3r, Ozaiq, A Forest Running Faster, Paint Thief). Each company has its own Supabase, Stripe, Discord, and WebSocket configurations defined in `config/companies.ts`.
 
 **Data Fetching**: Uses React Query for server state management with Supabase as the backend. API routes in `app/api/` handle external service integrations.
 
 **Authentication Flow**: Supabase Auth with middleware protection for dashboard routes. Auth check happens in `app/api/auth/check/route.ts`.
 
-**Styling System**: Uses Tailwind with CSS variables for theming. Dark mode is implemented with class-based toggling. Custom color palette defined in `tailwind.config.js`.
+**Styling System**: Uses Tailwind with CSS variables for theming. Dark mode is implemented with class-based toggling (`darkMode: ["class"]`). Custom color palette with HSL-based design tokens.
 
 **Component Architecture**:
-
 - Page components in `app/dashboard/`
 - Reusable UI components in `components/ui/`
 - Business logic components in `app/components/`
 
 ## Environment Variables Required
 
+Each company requires its own set of environment variables prefixed with the company name:
+
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# For each company (replace [COMPANY] with RTHMN, SECONDISC, REALITYDESIGNERS, etc.)
+NEXT_PUBLIC_[COMPANY]_SUPABASE_URL=
+NEXT_PUBLIC_[COMPANY]_SUPABASE_ANON_KEY=
+[COMPANY]_SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_[COMPANY]_STRIPE_PUBLISHABLE_KEY=
+[COMPANY]_STRIPE_SECRET_KEY=
+[COMPANY]_STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_[COMPANY]_SERVER_URL=
+NEXT_PUBLIC_[COMPANY]_WS_URL=
 
-# Stripe
-STRIPE_SECRET_KEY=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_WEBHOOK_SECRET=
-
-# Discord
-DISCORD_CLIENT_ID=
-DISCORD_CLIENT_SECRET=
-
-# Resend
-RESEND_API_KEY=
+# Discord (optional for companies)
+NEXT_PUBLIC_[COMPANY]_DISCORD_CLIENT_ID=
+[COMPANY]_DISCORD_CLIENT_SECRET=
+[COMPANY]_DISCORD_BOT_TOKEN=
+[COMPANY]_DISCORD_GUILD_ID=
+[COMPANY]_DISCORD_PAID_ROLE_ID=
+[COMPANY]_DISCORD_UNPAID_ROLE_ID=
+NEXT_PUBLIC_[COMPANY]_DISCORD_REDIRECT_URI=
 ```
 
 ## Development Guidelines
 
-**Package Manager**: Prefer Bun over npm/yarn for faster installs and script execution.
+**Package Manager**: Prefer Bun over npm/yarn for faster installs and script execution. Husky is configured with lint-staged to run `bun format` on all staged files.
 
-**TypeScript Configuration**: Uses relaxed TypeScript settings (`strict: false`) for rapid development. Path aliases configured with `@/*` pointing to root.
+**TypeScript Configuration**: Uses relaxed TypeScript settings (`strict: false`, `noImplicitAny: false`) for rapid development. Path aliases configured with `@/*` pointing to root.
 
-**Code Formatting**: Prettier is configured with import sorting. Use `bun run format` before committing.
+**Code Formatting**: Prettier is configured with Tailwind plugin, 4-space tabs, 180 character line width, and import sorting via `@ianvs/prettier-plugin-sort-imports`. Use `bun run format` before committing.
 
 **Component Patterns**:
-
 - Use `'use client'` directive for client components
 - Leverage React Query for data fetching
 - Use CompanyContext for multi-company state
 - Follow Tailwind utility-first approach
+- Use Zustand for complex client-side state management
 
 **API Integration**:
-
 - External service integrations go in `app/api/`
-- Use Supabase client in `lib/supabase/` for database operations
+- Use company-specific Supabase clients from `lib/supabase/`
 - Webhook handlers for Stripe payments in `app/api/payments/`
+- Discord API integrations in `app/api/discord/`
 
-**Dark Mode**: Implemented with Tailwind's class-based dark mode. Toggle functionality in dashboard layout.
+**Multi-Company Pattern**: When working with company-specific functionality, always use the CompanyContext to get the selected company configuration and create appropriate client instances.
