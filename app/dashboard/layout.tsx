@@ -2,39 +2,74 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Building2, CreditCard, MessageSquare, Mail, Menu, X, Moon, Sun, Eye, Heart, CheckSquare, Calendar, Settings, Dumbbell, Book, BarChart, Users, FileText, Shield, Clock } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+    LayoutDashboard,
+    Building2,
+    CreditCard,
+    MessageSquare,
+    Mail,
+    Menu,
+    X,
+    Moon,
+    Sun,
+    Eye,
+    Heart,
+    CheckSquare,
+    Calendar,
+    Settings,
+    Dumbbell,
+    Book,
+    BarChart,
+    Users,
+    FileText,
+    Shield,
+    Clock,
+    LogOut,
+} from 'lucide-react';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { CompanySelector } from '../components/CompanySelector';
 import ChatSidebar from '../components/ChatSidebar';
+import { createBrowserClient } from '@supabase/ssr';
+import LogoutButton from '@/components/auth/LogoutButton';
+import UserContextIndicator from './components/UserContextIndicator';
 
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Vision Board', href: '/dashboard/vision', icon: Eye },
-    { name: 'Personal', href: '/dashboard/personal', icon: Heart,
-      children: [
-        { name: 'Overview', href: '/dashboard/personal', icon: LayoutDashboard },
-        { name: 'Health & Fitness', href: '/dashboard/personal/health', icon: Dumbbell },
-        { name: 'Contacts', href: '/dashboard/personal/contacts', icon: Users },
-        { name: 'Routines', href: '/dashboard/personal/routines', icon: Clock },
-        { name: 'Documents', href: '/dashboard/personal/documents', icon: Shield },
-        { name: 'Analytics', href: '/dashboard/personal/analytics', icon: BarChart },
-      ]
+    {
+        name: 'Personal',
+        href: '/dashboard/personal',
+        icon: Heart,
+        children: [
+            { name: 'Overview', href: '/dashboard/personal', icon: LayoutDashboard },
+            { name: 'Health & Fitness', href: '/dashboard/personal/health', icon: Dumbbell },
+            { name: 'Contacts', href: '/dashboard/personal/contacts', icon: Users },
+            { name: 'Routines', href: '/dashboard/personal/routines', icon: Clock },
+            { name: 'Documents', href: '/dashboard/personal/documents', icon: Shield },
+            { name: 'Analytics', href: '/dashboard/personal/analytics', icon: BarChart },
+        ],
     },
-    { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare,
-      children: [
-        { name: 'Overview', href: '/dashboard/tasks', icon: LayoutDashboard },
-        { name: 'Manage Tasks', href: '/dashboard/tasks/manage', icon: CheckSquare },
-        { name: 'Calendar', href: '/dashboard/tasks/calendar', icon: Calendar },
-      ]
+    {
+        name: 'Tasks',
+        href: '/dashboard/tasks',
+        icon: CheckSquare,
+        children: [
+            { name: 'Overview', href: '/dashboard/tasks', icon: LayoutDashboard },
+            { name: 'Manage Tasks', href: '/dashboard/tasks/manage', icon: CheckSquare },
+            { name: 'Calendar', href: '/dashboard/tasks/calendar', icon: Calendar },
+        ],
     },
-    { name: 'Companies', href: '/dashboard/companies', icon: Building2, 
-      children: [
-        { name: 'Overview', href: '/dashboard/companies', icon: LayoutDashboard },
-        { name: 'Payments', href: '/dashboard/companies/payments', icon: CreditCard },
-        { name: 'Discord', href: '/dashboard/companies/discord', icon: MessageSquare },
-        { name: 'Support', href: '/dashboard/companies/support', icon: Mail },
-      ]
+    {
+        name: 'Companies',
+        href: '/dashboard/companies',
+        icon: Building2,
+        children: [
+            { name: 'Overview', href: '/dashboard/companies', icon: LayoutDashboard },
+            { name: 'Payments', href: '/dashboard/companies/payments', icon: CreditCard },
+            { name: 'Discord', href: '/dashboard/companies/discord', icon: MessageSquare },
+            { name: 'Support', href: '/dashboard/companies/support', icon: Mail },
+        ],
     },
 ];
 
@@ -73,9 +108,44 @@ function useDarkMode() {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const pathname = usePathname();
+    const router = useRouter();
     const [isDark, toggleDark] = useDarkMode();
     const isCompaniesRoute = pathname.startsWith('/dashboard/companies');
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                router.push('/auth/login');
+                return;
+            }
+
+            setIsAuthenticated(true);
+            setIsLoading(false);
+        };
+
+        checkAuth();
+    }, [router]);
+
+    if (isLoading) {
+        return (
+            <div className='flex min-h-screen items-center justify-center'>
+                <div className='text-lg'>Loading...</div>
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return null;
+    }
 
     const sidebarContent = (
         <>
@@ -98,9 +168,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {navigation.map((item) => {
                             const isActive = pathname === item.href;
                             const hasChildren = item.children && item.children.length > 0;
-                            const isChildActive = hasChildren && item.children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
+                            const isChildActive = hasChildren && item.children.some((child) => pathname === child.href || pathname.startsWith(child.href + '/'));
                             const showChildren = hasChildren && (isActive || isChildActive || pathname.startsWith(item.href + '/'));
-                            
+
                             return (
                                 <div key={item.name}>
                                     <Link
@@ -122,9 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                         key={child.name}
                                                         href={child.href}
                                                         className={`group flex items-center rounded-md px-2 py-1 text-sm transition-colors ${
-                                                            isChildItemActive
-                                                                ? 'bg-primary/5 text-primary'
-                                                                : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
+                                                            isChildItemActive ? 'bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
                                                         }`}>
                                                         <child.icon className='mr-3 h-4 w-4' />
                                                         {child.name}
@@ -136,6 +204,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 </div>
                             );
                         })}
+                    </div>
+                    {/* Account and Logout for mobile */}
+                    <div className='space-y-2 border-t border-border/50 p-4'>
+                        <Link
+                            href='/dashboard/account'
+                            className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                pathname === '/dashboard/account'
+                                    ? 'border border-primary/20 bg-primary/10 text-primary'
+                                    : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                            }`}>
+                            <Settings className='mr-3 h-5 w-5' />
+                            Account
+                        </Link>
+                        <LogoutButton />
                     </div>
                 </div>
             </div>
@@ -158,9 +240,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {navigation.map((item) => {
                             const isActive = pathname === item.href;
                             const hasChildren = item.children && item.children.length > 0;
-                            const isChildActive = hasChildren && item.children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
+                            const isChildActive = hasChildren && item.children.some((child) => pathname === child.href || pathname.startsWith(child.href + '/'));
                             const showChildren = hasChildren && (isActive || isChildActive || pathname.startsWith(item.href + '/'));
-                            
+
                             return (
                                 <div key={item.name}>
                                     <Link
@@ -182,9 +264,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                                         key={child.name}
                                                         href={child.href}
                                                         className={`group flex items-center rounded-md px-2 py-1 text-sm transition-colors ${
-                                                            isChildItemActive
-                                                                ? 'bg-primary/5 text-primary'
-                                                                : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
+                                                            isChildItemActive ? 'bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
                                                         }`}>
                                                         <child.icon className='mr-3 h-4 w-4' />
                                                         {child.name}
@@ -196,6 +276,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 </div>
                             );
                         })}
+                    </div>
+                    {/* Account and Logout for desktop */}
+                    <div className='space-y-2 border-t border-border/50 p-4'>
+                        <Link
+                            href='/dashboard/account'
+                            className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                                pathname === '/dashboard/account'
+                                    ? 'border border-primary/20 bg-primary/10 text-primary'
+                                    : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
+                            }`}>
+                            <Settings className='mr-3 h-5 w-5' />
+                            Account
+                        </Link>
+                        <LogoutButton />
                     </div>
                 </div>
             </div>
@@ -214,11 +308,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Menu className='h-6 w-6' />
                     </button>
                     <div className='flex items-center gap-4'>
-                        <button 
-                            onClick={() => setChatSidebarOpen(!chatSidebarOpen)} 
-                            className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground transition-colors'
-                            title="Toggle Chat"
-                        >
+                        <UserContextIndicator />
+                        <button
+                            onClick={() => setChatSidebarOpen(!chatSidebarOpen)}
+                            className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
+                            title='Toggle Chat'>
                             <MessageSquare className='h-5 w-5' />
                         </button>
                         <button onClick={toggleDark} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
@@ -232,20 +326,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Chat Sidebar */}
-            <ChatSidebar 
-                isOpen={chatSidebarOpen} 
-                onToggle={() => setChatSidebarOpen(!chatSidebarOpen)} 
-            />
+            <ChatSidebar isOpen={chatSidebarOpen} onToggle={() => setChatSidebarOpen(!chatSidebarOpen)} />
         </>
     );
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-background via-background/95 to-background/90'>
-            {isCompaniesRoute ? (
-                <CompanyProvider>{mainContent}</CompanyProvider>
-            ) : (
-                mainContent
-            )}
+            {isCompaniesRoute ? <CompanyProvider>{mainContent}</CompanyProvider> : mainContent}
         </div>
     );
 }

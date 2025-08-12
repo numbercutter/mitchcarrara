@@ -5,10 +5,10 @@ import { Send, Paperclip, Smile, MoreVertical, X, MessageSquare, ChevronRight, C
 
 interface ChatMessage {
     id: string;
-    sender: 'me' | 'assistant';
-    message: string;
-    timestamp: string;
-    type: 'text' | 'task' | 'file';
+    sender: 'user' | 'assistant';
+    content: string;
+    created_at: string;
+    message_type: 'text' | 'task' | 'file' | 'system';
     metadata?: {
         taskId?: string;
         fileName?: string;
@@ -19,10 +19,9 @@ interface ChatMessage {
 interface ChatThread {
     id: string;
     title: string;
-    date: string;
-    messages: ChatMessage[];
-    lastMessage: string;
-    timestamp: string;
+    created_at: string;
+    updated_at: string;
+    is_archived: boolean;
     messageCount: number;
 }
 
@@ -34,172 +33,188 @@ interface ChatSidebarProps {
 export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     const [threads, setThreads] = useState<ChatThread[]>([]);
     const [currentThreadId, setCurrentThreadId] = useState<string>('');
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Get today's thread ID
-    const getTodaysThreadId = () => {
-        const today = new Date().toISOString().split('T')[0];
-        return `thread-${today}`;
-    };
+    // Fetch conversations from database
+    const fetchConversations = async () => {
+        try {
+            const response = await fetch('/api/chat/conversations');
+            if (response.ok) {
+                const conversations = await response.json();
+                setThreads(conversations);
 
-    // Initialize or get today's thread
-    const initializeTodaysThread = () => {
-        const todaysId = getTodaysThreadId();
-        const existingThread = threads.find(t => t.id === todaysId);
-        
-        if (!existingThread) {
-            const newThread: ChatThread = {
-                id: todaysId,
-                title: `Chat - ${new Date().toLocaleDateString()}`,
-                date: new Date().toISOString().split('T')[0],
-                messages: [{
-                    id: '1',
-                    sender: 'assistant',
-                    message: 'Hi! I\'m your assistant. I\'m here to help with any tasks or questions you have.',
-                    timestamp: new Date().toISOString(),
-                    type: 'text'
-                }],
-                lastMessage: 'Hi! I\'m your assistant. I\'m here to help with any tasks or questions you have.',
-                timestamp: new Date().toISOString(),
-                messageCount: 1
-            };
-            setThreads(prev => [newThread, ...prev]);
-            setCurrentThreadId(todaysId);
-            return newThread;
+                // Set current thread to most recent if none selected
+                if (!currentThreadId && conversations.length > 0) {
+                    setCurrentThreadId(conversations[0].id);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching conversations:', error);
         }
-        
-        setCurrentThreadId(todaysId);
-        return existingThread;
     };
 
-    // Get current thread
-    const getCurrentThread = () => {
-        return threads.find(t => t.id === currentThreadId);
+    // Fetch messages for current thread
+    const fetchMessages = async (threadId: string) => {
+        if (!threadId) return;
+
+        try {
+            setIsLoading(true);
+            const response = await fetch(`/api/chat/conversations/${threadId}/messages`);
+            if (response.ok) {
+                const newMessages = await response.json();
+                setMessages(newMessages);
+            }
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    // Get current messages
-    const getCurrentMessages = () => {
-        const thread = getCurrentThread();
-        return thread?.messages || [];
+    // Create today's conversation if it doesn't exist
+    const createTodaysConversation = async () => {
+        try {
+            const title = `Chat - ${new Date().toLocaleDateString()}`;
+            const response = await fetch('/api/chat/conversations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title }),
+            });
+
+            if (response.ok) {
+                const newConversation = await response.json();
+                setThreads((prev) => [newConversation, ...prev]);
+                setCurrentThreadId(newConversation.id);
+                return newConversation;
+            }
+        } catch (error) {
+            console.error('Error creating conversation:', error);
+        }
+    };
+
+    // Poll for new messages every minute
+    const startPolling = (threadId: string) => {
+        // Clear existing interval
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+        }
+
+        // Start new polling interval
+        pollingIntervalRef.current = setInterval(() => {
+            fetchMessages(threadId);
+        }, 60000); // Poll every 60 seconds (1 minute)
+    };
+
+    const stopPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
     };
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // Load from localStorage and initialize today's thread
+    // Initialize chat when sidebar opens
     useEffect(() => {
-        const savedThreads = localStorage.getItem('chat-threads');
-        if (savedThreads) {
-            const parsedThreads = JSON.parse(savedThreads);
-            setThreads(parsedThreads);
-            // Set current thread to today or most recent
-            const todaysId = getTodaysThreadId();
-            const todaysThread = parsedThreads.find((t: ChatThread) => t.id === todaysId);
-            if (todaysThread) {
-                setCurrentThreadId(todaysId);
-            } else {
-                initializeTodaysThread();
-            }
-        } else {
-            initializeTodaysThread();
+        if (isOpen) {
+            fetchConversations();
         }
-    }, []);
+    }, [isOpen]);
 
-    // Save to localStorage whenever threads change
+    // Fetch messages when thread changes and start polling
     useEffect(() => {
-        if (threads.length > 0) {
-            localStorage.setItem('chat-threads', JSON.stringify(threads));
+        if (currentThreadId) {
+            fetchMessages(currentThreadId);
+            startPolling(currentThreadId);
         }
-    }, [threads]);
+
+        return () => {
+            stopPolling();
+        };
+    }, [currentThreadId]);
 
     // Scroll to bottom when messages change
     useEffect(() => {
         scrollToBottom();
-    }, [currentThreadId]);
+    }, [messages]);
 
-    // Auto-switch to today's thread if it doesn't exist
+    // Cleanup polling on unmount
     useEffect(() => {
-        const todaysId = getTodaysThreadId();
-        if (currentThreadId && currentThreadId !== todaysId) {
-            const todaysThread = threads.find(t => t.id === todaysId);
-            if (!todaysThread) {
-                initializeTodaysThread();
-            }
-        }
+        return () => {
+            stopPolling();
+        };
     }, []);
 
     const handleSendMessage = async () => {
         if (!newMessage.trim()) return;
 
-        const message: ChatMessage = {
-            id: Date.now().toString(),
-            sender: 'me',
-            message: newMessage.trim(),
-            timestamp: new Date().toISOString(),
-            type: 'text'
-        };
-
-        // Add message to current thread
-        setThreads(prev => prev.map(thread => {
-            if (thread.id === currentThreadId) {
-                const updatedMessages = [...thread.messages, message];
-                return {
-                    ...thread,
-                    messages: updatedMessages,
-                    lastMessage: message.message,
-                    timestamp: message.timestamp,
-                    messageCount: updatedMessages.length
-                };
-            }
-            return thread;
-        }));
-
+        const messageContent = newMessage.trim();
         setNewMessage('');
         setIsTyping(true);
 
-        // Simulate assistant response
-        setTimeout(() => {
-            const assistantMessage: ChatMessage = {
-                id: (Date.now() + 1).toString(),
-                sender: 'assistant',
-                message: 'I received your message: "' + message.message + '". How can I help you with this?',
-                timestamp: new Date().toISOString(),
-                type: 'text'
-            };
-            
-            setThreads(prev => prev.map(thread => {
-                if (thread.id === currentThreadId) {
-                    const updatedMessages = [...thread.messages, assistantMessage];
-                    return {
-                        ...thread,
-                        messages: updatedMessages,
-                        lastMessage: assistantMessage.message,
-                        timestamp: assistantMessage.timestamp,
-                        messageCount: updatedMessages.length
-                    };
-                }
-                return thread;
-            }));
+        try {
+            // If no current thread, create today's conversation
+            let threadId = currentThreadId;
+            if (!threadId) {
+                const newConversation = await createTodaysConversation();
+                threadId = newConversation?.id;
+            }
+
+            if (!threadId) {
+                throw new Error('No conversation available');
+            }
+
+            // Send message via API
+            const response = await fetch(`/api/chat/conversations/${threadId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: messageContent,
+                    sender: 'user',
+                    message_type: 'text',
+                }),
+            });
+
+            if (response.ok) {
+                // Refresh messages to show new message
+                await fetchMessages(threadId);
+
+                // Refresh conversations list to update timestamps
+                await fetchConversations();
+            } else {
+                throw new Error('Failed to send message');
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            // Restore the message if it failed
+            setNewMessage(messageContent);
+        } finally {
             setIsTyping(false);
-        }, 1000);
+        }
     };
 
     // Filter threads based on search
-    const filteredThreads = threads.filter(thread => 
-        thread.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        thread.messages.some(msg => msg.message.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    const filteredThreads = threads.filter((thread) => thread.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Switch to a thread
     const switchToThread = (threadId: string) => {
         setCurrentThreadId(threadId);
         setShowHistory(false);
+    };
+
+    // Get current thread
+    const getCurrentThread = () => {
+        return threads.find((t) => t.id === currentThreadId);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -212,18 +227,21 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     const formatTime = (timestamp: string) => {
         return new Date(timestamp).toLocaleTimeString('en-US', {
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
         });
+    };
+
+    const formatDate = (timestamp: string) => {
+        return new Date(timestamp).toLocaleDateString();
     };
 
     if (!isOpen) {
         return (
             <button
                 onClick={onToggle}
-                className="fixed right-4 bottom-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-colors"
-                title="Open Chat"
-            >
-                <MessageSquare className="h-6 w-6" />
+                className='fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90'
+                title='Open Chat'>
+                <MessageSquare className='h-6 w-6' />
             </button>
         );
     }
@@ -231,42 +249,34 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     return (
         <>
             {/* Overlay for mobile */}
-            <div 
-                className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden ${isOpen ? '' : 'hidden'}`}
-                onClick={onToggle}
-            />
-            
+            <div className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden ${isOpen ? '' : 'hidden'}`} onClick={onToggle} />
+
             {/* Chat Sidebar */}
-            <div className="fixed right-0 top-0 z-50 h-full w-80 flex flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]">
+            <div className='fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
                 {/* Header */}
-                <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
-                    <div className="flex items-center gap-3">
-                        <MessageSquare className="h-5 w-5 text-primary" />
-                        <span className="font-semibold text-foreground">
-                            {showHistory ? 'Chat History' : 'Assistant Chat'}
-                        </span>
+                <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
+                    <div className='flex items-center gap-3'>
+                        <MessageSquare className='h-5 w-5 text-primary' />
+                        <span className='font-semibold text-foreground'>{showHistory ? 'Chat History' : 'Assistant Chat'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className='flex items-center gap-2'>
                         <button
                             onClick={() => setShowHistory(!showHistory)}
-                            className="rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground transition-colors"
-                            title={showHistory ? "Back to Chat" : "View History"}
-                        >
-                            {showHistory ? <MessageSquare className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                            className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
+                            title={showHistory ? 'Back to Chat' : 'View History'}>
+                            {showHistory ? <MessageSquare className='h-4 w-4' /> : <History className='h-4 w-4' />}
                         </button>
                         <button
                             onClick={onToggle}
-                            className="rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground transition-colors"
-                            title="Minimize Chat"
-                        >
-                            <ChevronRight className="h-4 w-4" />
+                            className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
+                            title='Minimize Chat'>
+                            <ChevronRight className='h-4 w-4' />
                         </button>
                         <button
                             onClick={onToggle}
-                            className="rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground transition-colors lg:hidden"
-                            title="Close Chat"
-                        >
-                            <X className="h-4 w-4" />
+                            className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground lg:hidden'
+                            title='Close Chat'>
+                            <X className='h-4 w-4' />
                         </button>
                     </div>
                 </div>
@@ -275,49 +285,43 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                     /* History Panel */
                     <>
                         {/* Search */}
-                        <div className="p-4 border-b border-border/50">
-                            <div className="flex items-center gap-2 rounded-md border border-border/50 bg-background/50 p-2">
-                                <Search className="h-4 w-4 text-muted-foreground" />
+                        <div className='border-b border-border/50 p-4'>
+                            <div className='flex items-center gap-2 rounded-md border border-border/50 bg-background/50 p-2'>
+                                <Search className='h-4 w-4 text-muted-foreground' />
                                 <input
-                                    type="text"
+                                    type='text'
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search chat history..."
-                                    className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                                    placeholder='Search chat history...'
+                                    className='flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none'
                                 />
                             </div>
                         </div>
 
                         {/* Thread List */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        <div className='flex-1 space-y-3 overflow-y-auto p-4'>
                             {filteredThreads.map((thread) => (
                                 <div
                                     key={thread.id}
                                     onClick={() => switchToThread(thread.id)}
                                     className={`cursor-pointer rounded-lg border p-3 transition-colors hover:bg-secondary/50 ${
                                         thread.id === currentThreadId ? 'border-primary bg-primary/10' : 'border-border/50'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="font-medium text-sm text-foreground truncate">{thread.title}</h3>
-                                        <span className="text-xs text-muted-foreground">
-                                            {thread.messageCount} msgs
-                                        </span>
+                                    }`}>
+                                    <div className='mb-2 flex items-center justify-between'>
+                                        <h3 className='truncate text-sm font-medium text-foreground'>{thread.title}</h3>
+                                        <span className='text-xs text-muted-foreground'>{thread.messageCount || 0} msgs</span>
                                     </div>
-                                    <p className="text-xs text-muted-foreground truncate mb-2">
-                                        {thread.lastMessage}
-                                    </p>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <Calendar className="h-3 w-3" />
-                                        <span>{new Date(thread.date).toLocaleDateString()}</span>
-                                        <span>{formatTime(thread.timestamp)}</span>
+                                    <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                                        <Calendar className='h-3 w-3' />
+                                        <span>{formatDate(thread.updated_at)}</span>
+                                        <span>{formatTime(thread.updated_at)}</span>
                                     </div>
                                 </div>
                             ))}
                             {filteredThreads.length === 0 && (
-                                <div className="text-center text-muted-foreground py-8">
-                                    <Archive className="h-8 w-8 mx-auto mb-2" />
-                                    <p className="text-sm">No chat history found</p>
+                                <div className='py-8 text-center text-muted-foreground'>
+                                    <Archive className='mx-auto mb-2 h-8 w-8' />
+                                    <p className='text-sm'>No chat history found</p>
                                 </div>
                             )}
                         </div>
@@ -325,77 +329,75 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                 ) : (
                     /* Current Chat */
                     <>
-
                         {/* Current Thread Info */}
                         {getCurrentThread() && (
-                            <div className="p-3 border-b border-border/50 bg-secondary/20">
-                                <div className="text-sm font-medium text-foreground">
-                                    {getCurrentThread()?.title}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    {getCurrentMessages().length} messages
+                            <div className='border-b border-border/50 bg-secondary/20 p-3'>
+                                <div className='text-sm font-medium text-foreground'>{getCurrentThread()?.title}</div>
+                                <div className='text-xs text-muted-foreground'>
+                                    {messages.length} messages
+                                    {isLoading && ' • Loading...'}
                                 </div>
                             </div>
                         )}
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                            {getCurrentMessages().map((message) => (
-                        <div
-                            key={message.id}
-                            className={`flex ${message.sender === 'me' ? 'justify-end' : 'justify-start'}`}
-                        >
-                            <div
-                                className={`max-w-[80%] rounded-lg px-3 py-2 ${
-                                    message.sender === 'me'
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-secondary/50 text-foreground'
-                                }`}
-                            >
-                                <p className="text-sm">{message.message}</p>
-                                {message.type === 'task' && message.metadata?.taskTitle && (
-                                    <div className="mt-2 rounded bg-background/20 p-2">
-                                        <p className="text-xs font-medium">Task: {message.metadata.taskTitle}</p>
+                        <div className='flex-1 space-y-4 overflow-y-auto p-4'>
+                            {messages.map((message) => (
+                                <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div
+                                        className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                                            message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-foreground'
+                                        }`}>
+                                        <p className='text-sm'>{message.content}</p>
+                                        {message.message_type === 'task' && message.metadata?.taskTitle && (
+                                            <div className='mt-2 rounded bg-background/20 p-2'>
+                                                <p className='text-xs font-medium'>Task: {message.metadata.taskTitle}</p>
+                                            </div>
+                                        )}
+                                        <p className='mt-1 text-xs opacity-70'>{formatTime(message.created_at)}</p>
                                     </div>
-                                )}
-                                <p className="mt-1 text-xs opacity-70">{formatTime(message.timestamp)}</p>
-                            </div>
-                        </div>
-                    ))}
-
-                    {isTyping && (
-                        <div className="flex justify-start">
-                            <div className="max-w-[80%] rounded-lg bg-secondary/50 px-3 py-2">
-                                <div className="flex space-x-1">
-                                    <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]"></div>
-                                    <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]"></div>
-                                    <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60"></div>
                                 </div>
-                            </div>
-                        </div>
-                    )}
+                            ))}
+
+                            {messages.length === 0 && !isLoading && (
+                                <div className='py-8 text-center text-muted-foreground'>
+                                    <MessageSquare className='mx-auto mb-2 h-8 w-8' />
+                                    <p className='text-sm'>No messages yet. Start a conversation!</p>
+                                </div>
+                            )}
+
+                            {isTyping && (
+                                <div className='flex justify-start'>
+                                    <div className='max-w-[80%] rounded-lg bg-secondary/50 px-3 py-2'>
+                                        <div className='flex space-x-1'>
+                                            <div className='h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]'></div>
+                                            <div className='h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]'></div>
+                                            <div className='h-2 w-2 animate-bounce rounded-full bg-muted-foreground/60'></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div ref={messagesEndRef} />
                         </div>
 
                         {/* Input */}
-                        <div className="border-t border-border/50 p-4">
-                            <div className="flex items-center gap-2 rounded-md border border-border/50 bg-background/50 p-2">
+                        <div className='border-t border-border/50 p-4'>
+                            <div className='flex items-center gap-2 rounded-md border border-border/50 bg-background/50 p-2'>
                                 <input
                                     ref={inputRef}
-                                    type="text"
+                                    type='text'
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="Ask your assistant..."
-                                    className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none"
+                                    placeholder='Ask your assistant...'
+                                    className='flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none'
                                 />
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!newMessage.trim() || isTyping}
-                                    className="rounded-md p-1.5 text-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <Send className="h-4 w-4" />
+                                    className='rounded-md p-1.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50'>
+                                    <Send className='h-4 w-4' />
                                 </button>
                             </div>
                         </div>

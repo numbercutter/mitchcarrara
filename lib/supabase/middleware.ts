@@ -1,48 +1,35 @@
-import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { getCompanyConfig } from '@/config/companies';
+import { type NextRequest, NextResponse } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
-    const pathname = request.nextUrl.pathname;
-    const companyId = pathname.split('/')[1];
+    let supabaseResponse = NextResponse.next({
+        request,
+    });
 
-    if (!companyId) {
-        return NextResponse.redirect(new URL('/signin', request.url));
+    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+        cookies: {
+            getAll() {
+                return request.cookies.getAll();
+            },
+            setAll(cookiesToSet) {
+                cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+                supabaseResponse = NextResponse.next({
+                    request,
+                });
+                cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options));
+            },
+        },
+    });
+
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/signin';
+        return NextResponse.redirect(url);
     }
 
-    try {
-        const company = getCompanyConfig(companyId);
-        let response = NextResponse.next({
-            request: {
-                headers: request.headers,
-            },
-        });
-
-        const supabase = createServerClient(company.supabase.url, company.supabase.anonKey, {
-            cookies: {
-                get(name: string) {
-                    return request.cookies.get(name)?.value;
-                },
-                set(name: string, value: string, options: any) {
-                    response.cookies.set({
-                        name,
-                        value,
-                        ...options,
-                    });
-                },
-                remove(name: string, options: any) {
-                    response.cookies.set({
-                        name,
-                        value: '',
-                        ...options,
-                    });
-                },
-            },
-        });
-
-        return response;
-    } catch (error) {
-        console.error('Error in updateSession:', error);
-        throw error; // Let the middleware handle the error
-    }
+    return supabaseResponse;
 }

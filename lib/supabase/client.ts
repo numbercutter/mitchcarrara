@@ -1,6 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
-import { CompanyConfig } from '@/config/companies';
 
-export function createClient(company: CompanyConfig) {
-    return createBrowserClient(company.supabase.url, company.supabase.anonKey);
+export function createClient() {
+    return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 }

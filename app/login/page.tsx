@@ -2,30 +2,35 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, Loader2, Shield } from 'lucide-react';
+import { Mail, Loader2, User } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [message, setMessage] = useState('');
     const router = useRouter();
+    const supabase = createClient();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setMessage('');
         setIsLoading(true);
 
         try {
-            const response = await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password }),
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    emailRedirectTo: `${window.location.origin}/dashboard`,
+                },
             });
 
-            if (response.ok) {
-                router.push('/dashboard');
+            if (error) {
+                setError(error.message);
             } else {
-                setError('Incorrect password');
+                setMessage('Check your email for the login link!');
             }
         } catch (error) {
             setError('An error occurred. Please try again.');
@@ -50,38 +55,39 @@ export default function LoginPage() {
                 <div className='text-center'>
                     <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary p-1'>
                         <div className='flex h-full w-full items-center justify-center rounded-full bg-card'>
-                            <Shield className='h-8 w-8 text-primary' />
+                            <User className='h-8 w-8 text-primary' />
                         </div>
                     </div>
-                    <h2 className='mt-6 text-3xl font-bold tracking-tight text-foreground'>Admin Portal</h2>
-                    <p className='mt-2 text-sm text-muted-foreground'>Enter your password to continue</p>
+                    <h2 className='mt-6 text-3xl font-bold tracking-tight text-foreground'>mitchcarrara.com</h2>
+                    <p className='mt-2 text-sm text-muted-foreground'>Sign in with your email address</p>
                 </div>
 
                 <form className='mt-8 space-y-6' onSubmit={handleSubmit}>
                     <div className='space-y-4'>
                         <div>
-                            <label htmlFor='password' className='sr-only'>
-                                Password
+                            <label htmlFor='email' className='sr-only'>
+                                Email address
                             </label>
                             <div className='relative'>
                                 <input
-                                    id='password'
-                                    name='password'
-                                    type='password'
+                                    id='email'
+                                    name='email'
+                                    type='email'
                                     required
                                     className='block w-full rounded-lg border-0 bg-card/5 py-3 pl-4 pr-10 text-foreground ring-1 ring-inset ring-card/10 placeholder:text-muted-foreground focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6'
-                                    placeholder='Enter password'
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder='Enter your email'
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     disabled={isLoading}
                                 />
                                 <div className='pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3'>
-                                    <Lock className='h-5 w-5 text-card/20' />
+                                    <Mail className='h-5 w-5 text-card/20' />
                                 </div>
                             </div>
                         </div>
 
                         {error && <div className='rounded-lg bg-red-500/10 p-3 text-sm text-red-400 ring-1 ring-inset ring-red-500/20'>{error}</div>}
+                        {message && <div className='rounded-lg bg-green-500/10 p-3 text-sm text-green-400 ring-1 ring-inset ring-green-500/20'>{message}</div>}
                     </div>
 
                     <div>
@@ -89,7 +95,7 @@ export default function LoginPage() {
                             type='submit'
                             disabled={isLoading}
                             className='group relative flex w-full justify-center rounded-lg bg-gradient-to-r from-primary to-primary px-3 py-3 text-sm font-semibold text-foreground shadow-lg shadow-primary/25 transition-all hover:from-primary hover:to-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50'>
-                            {isLoading ? <Loader2 className='h-5 w-5 animate-spin' /> : 'Sign in'}
+                            {isLoading ? <Loader2 className='h-5 w-5 animate-spin' /> : 'Send login link'}
                         </button>
                     </div>
                 </form>
