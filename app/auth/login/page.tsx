@@ -10,7 +10,7 @@ function useSignInWithEmail() {
     return async (email: string) => {
         // For client-side, we need to check window location instead of NODE_ENV
         const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-        const redirectURL = isLocalhost ? getURL('/api/auth/callback?next=/dashboard') : 'https://mitchcarrara.com/api/auth/callback?next=/dashboard';
+        const redirectURL = isLocalhost ? getURL('/api/auth/callback?next=/dashboard') : 'https://www.mitchcarrara.com/api/auth/callback?next=/dashboard';
 
         const { error } = await supabase.auth.signInWithOtp({
             email,
