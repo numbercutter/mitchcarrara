@@ -24,10 +24,11 @@ export default function LoginForm() {
         const supabase = createClient();
 
         try {
-            const redirectUrl =
-                process.env.NODE_ENV === 'development'
-                    ? `${window.location.origin}/api/auth/callback?next=/dashboard/personal`
-                    : `https://mitchcarrara.com/api/auth/callback?next=/dashboard/personal`;
+            // Use window.location to detect environment more reliably
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const redirectUrl = isLocalhost
+                ? `${window.location.origin}/api/auth/callback?next=/dashboard/personal`
+                : `https://mitchcarrara.com/api/auth/callback?next=/dashboard/personal`;
 
             const { error } = await supabase.auth.signInWithOtp({
                 email,
