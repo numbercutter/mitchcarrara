@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { CompanyConfig } from '@/config/companies';
+
 import { Tables, TablesInsert, TablesUpdate } from '@/types/database';
 import { revalidatePath } from 'next/cache';
 
@@ -19,9 +19,9 @@ type PersonalActivityInsert = TablesInsert<'personal_activities'>;
 // TASK ACTIONS
 // =============================================
 
-export async function createTask(company: CompanyConfig, userId: string, task: Omit<TaskInsert, 'user_id'>): Promise<{ success: boolean; error?: string; data?: Tables<'tasks'> }> {
+export async function createTask(userId: string, task: Omit<TaskInsert, 'user_id'>): Promise<{ success: boolean; error?: string; data?: Tables<'tasks'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('tasks')
@@ -45,9 +45,9 @@ export async function createTask(company: CompanyConfig, userId: string, task: O
     }
 }
 
-export async function updateTask(company: CompanyConfig, taskId: string, updates: TaskUpdate): Promise<{ success: boolean; error?: string; data?: Tables<'tasks'> }> {
+export async function updateTask(taskId: string, updates: TaskUpdate): Promise<{ success: boolean; error?: string; data?: Tables<'tasks'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('tasks')
@@ -72,9 +72,9 @@ export async function updateTask(company: CompanyConfig, taskId: string, updates
     }
 }
 
-export async function deleteTask(company: CompanyConfig, taskId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteTask(taskId: string): Promise<{ success: boolean; error?: string }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { error } = await supabase.from('tasks').delete().eq('id', taskId);
 
@@ -92,12 +92,11 @@ export async function deleteTask(company: CompanyConfig, taskId: string): Promis
 }
 
 export async function createTaskChatMessage(
-    company: CompanyConfig,
     userId: string,
     message: Omit<TaskChatMessageInsert, 'user_id'>
 ): Promise<{ success: boolean; error?: string; data?: Tables<'task_chat_messages'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('task_chat_messages')
@@ -125,13 +124,9 @@ export async function createTaskChatMessage(
 // VISION ACTIONS
 // =============================================
 
-export async function createVisionCard(
-    company: CompanyConfig,
-    userId: string,
-    card: Omit<VisionCardInsert, 'user_id'>
-): Promise<{ success: boolean; error?: string; data?: Tables<'vision_cards'> }> {
+export async function createVisionCard(userId: string, card: Omit<VisionCardInsert, 'user_id'>): Promise<{ success: boolean; error?: string; data?: Tables<'vision_cards'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('vision_cards')
@@ -155,13 +150,9 @@ export async function createVisionCard(
     }
 }
 
-export async function updateVisionCard(
-    company: CompanyConfig,
-    cardId: string,
-    updates: VisionCardUpdate
-): Promise<{ success: boolean; error?: string; data?: Tables<'vision_cards'> }> {
+export async function updateVisionCard(cardId: string, updates: VisionCardUpdate): Promise<{ success: boolean; error?: string; data?: Tables<'vision_cards'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('vision_cards')
@@ -186,9 +177,9 @@ export async function updateVisionCard(
     }
 }
 
-export async function deleteVisionCard(company: CompanyConfig, cardId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteVisionCard(cardId: string): Promise<{ success: boolean; error?: string }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { error } = await supabase.from('vision_cards').delete().eq('id', cardId);
 
@@ -210,12 +201,11 @@ export async function deleteVisionCard(company: CompanyConfig, cardId: string): 
 // =============================================
 
 export async function createHealthMetric(
-    company: CompanyConfig,
     userId: string,
     metric: Omit<HealthMetricInsert, 'user_id'>
 ): Promise<{ success: boolean; error?: string; data?: Tables<'health_metrics'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('health_metrics')
@@ -240,13 +230,9 @@ export async function createHealthMetric(
     }
 }
 
-export async function createWorkoutLog(
-    company: CompanyConfig,
-    userId: string,
-    workout: Omit<WorkoutLogInsert, 'user_id'>
-): Promise<{ success: boolean; error?: string; data?: Tables<'workout_logs'> }> {
+export async function createWorkoutLog(userId: string, workout: Omit<WorkoutLogInsert, 'user_id'>): Promise<{ success: boolean; error?: string; data?: Tables<'workout_logs'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('workout_logs')
@@ -272,12 +258,11 @@ export async function createWorkoutLog(
 }
 
 export async function createPersonalActivity(
-    company: CompanyConfig,
     userId: string,
     activity: Omit<PersonalActivityInsert, 'user_id'>
 ): Promise<{ success: boolean; error?: string; data?: Tables<'personal_activities'> }> {
     try {
-        const supabase = await createClient(company);
+        const supabase = await createClient();
 
         const { data, error } = await supabase
             .from('personal_activities')

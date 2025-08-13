@@ -40,8 +40,8 @@ export default function SupportPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
-    // Initialize Supabase client with RTHMN config
-    const supabase = selectedCompany ? createClient(selectedCompany) : null;
+    // Initialize Supabase client
+    const supabase = selectedCompany ? createClient() : null;
 
     useEffect(() => {
         if (!supabase) {

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
 import { revalidatePath } from 'next/cache';
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
+        const { id } = await params;
 
         const { data, error } = await supabase
             .from('secure_documents')
@@ -19,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 notes: body.notes,
                 updated_at: new Date().toISOString(),
             })
-            .eq('id', params.id)
+            .eq('id', id)
             .eq('user_id', userId)
             .select()
             .single();
@@ -37,15 +38,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { supabase, userId } = await getDatabaseContext();
+        const { id } = await params;
 
         // First delete all document fields
-        await supabase.from('document_fields').delete().eq('document_id', params.id).eq('user_id', userId);
+        await supabase.from('document_fields').delete().eq('document_id', id).eq('user_id', userId);
 
         // Then delete the document
-        const { error } = await supabase.from('secure_documents').delete().eq('id', params.id).eq('user_id', userId);
+        const { error } = await supabase.from('secure_documents').delete().eq('id', id).eq('user_id', userId);
 
         if (error) {
             console.error('Error deleting document:', error);

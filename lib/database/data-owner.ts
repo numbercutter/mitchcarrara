@@ -13,48 +13,46 @@ const PRIMARY_DATA_OWNER_EMAIL = 'numbercutter@protonmail.com'; // Your email
  */
 export async function getDataOwnerUserId(): Promise<string> {
     const currentUserId = await getCurrentUserId();
-    
+
     if (!currentUserId) {
         throw new Error('User not authenticated');
     }
-    
+
     const supabase = await createClient();
-    
+
     // Get current user's email
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
     if (!user?.email) {
         throw new Error('User email not found');
     }
-    
+
     // If current user is the primary owner, return their ID
     if (user.email === PRIMARY_DATA_OWNER_EMAIL) {
         return currentUserId;
     }
-    
+
     // Otherwise, find the primary owner's user ID
     const { data: users } = await supabase.auth.admin.listUsers();
-    const primaryOwner = users.users.find(u => u.email === PRIMARY_DATA_OWNER_EMAIL);
-    
+    const primaryOwner = users?.users?.find((u: any) => u?.email === PRIMARY_DATA_OWNER_EMAIL);
+
     if (!primaryOwner) {
         throw new Error('Primary data owner not found');
     }
-    
+
     // Check if current user has access to primary owner's data
-    const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('preferences')
-        .eq('user_id', primaryOwner.id)
-        .single();
-    
+    const { data: profile } = await supabase.from('user_profiles').select('preferences').eq('user_id', primaryOwner.id).single();
+
     const sharedAccess = (profile?.preferences as any)?.shared_access || [];
     const hasAccess = sharedAccess.some((access: any) => access.user_id === currentUserId);
-    
+
     if (!hasAccess) {
         // If no access granted, return current user's ID (they'll see their own empty data)
         return currentUserId;
     }
-    
+
     // Return primary owner's ID so assistant sees your data
     return primaryOwner.id;
 }
@@ -64,8 +62,10 @@ export async function getDataOwnerUserId(): Promise<string> {
  */
 export async function isCurrentUserPrimaryOwner(): Promise<boolean> {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
     return user?.email === PRIMARY_DATA_OWNER_EMAIL;
 }
 
@@ -81,10 +81,12 @@ export async function getDisplayContext(): Promise<{
     const currentUserId = await getCurrentUserId();
     const dataOwnerUserId = await getDataOwnerUserId();
     const isOwner = await isCurrentUserPrimaryOwner();
-    
+
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
     return {
         isOwner,
         viewingOwnData: currentUserId === dataOwnerUserId,

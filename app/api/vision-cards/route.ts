@@ -1,28 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
-import { createVisionCard } from '@/lib/database/actions';
-import { TablesInsert } from '@/types/database';
+import { revalidatePath } from 'next/cache';
 
 export async function POST(request: NextRequest) {
     try {
-        const { company, userId } = await getDatabaseContext();
+        const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
 
-        const cardData: Omit<TablesInsert<'vision_cards'>, 'user_id'> = {
-            card_type: body.card_type,
-            title: body.title,
-            content: body.content,
-            position_x: body.position_x || null,
-            position_y: body.position_y || null,
-        };
+        const { data, error } = await supabase
+            .from('vision_cards')
+            .insert({
+                card_type: body.card_type,
+                title: body.title,
+                content: body.content,
+                position_x: body.position_x || null,
+                position_y: body.position_y || null,
+                user_id: userId,
+            })
+            .select()
+            .single();
 
-        const result = await createVisionCard(company, userId, cardData);
-
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+        if (error) {
+            console.error('Error creating vision card:', error);
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        return NextResponse.json(result.data);
+        revalidatePath('/dashboard/vision');
+        return NextResponse.json(data);
     } catch (error) {
         console.error('Error creating vision card:', error);
         return NextResponse.json({ error: 'Failed to create vision card' }, { status: 500 });

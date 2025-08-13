@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
                 routine_id: body.routine_id,
                 name: body.name,
                 description: body.description || null,
-                duration_minutes: body.duration_minutes || 0,
+                duration: body.duration || 0,
                 category: body.category || 'other',
                 order_in_routine: body.order_in_routine || 0,
                 user_id: userId,

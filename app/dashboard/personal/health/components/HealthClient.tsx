@@ -726,7 +726,7 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
         try {
             const method = weeklySchedule ? 'PATCH' : 'POST';
             const url = weeklySchedule ? `/api/weekly-schedule/${weeklySchedule.id}` : '/api/weekly-schedule';
-            
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -775,7 +775,7 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
         try {
             const method = workoutNotes ? 'PATCH' : 'POST';
             const url = workoutNotes ? `/api/workout-notes/${workoutNotes.id}` : '/api/workout-notes';
-            
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -948,10 +948,10 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
     };
 
     return (
-        <div className="space-y-8">
+        <div className='space-y-8'>
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold">Health & Fitness</h1>
+                <h1 className='text-3xl font-bold'>Health & Fitness</h1>
                 <p className='text-muted-foreground'>Track your nutrition, supplements, workouts, and health metrics</p>
             </div>
 
@@ -2468,7 +2468,9 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
                             <button onClick={resetLifestyleGoalForm} className='flex-1 rounded-md border px-4 py-2 hover:bg-accent'>
                                 Cancel
                             </button>
-                            <button onClick={editingLifestyleGoal ? updateLifestyleGoal : addLifestyleGoal} className='flex-1 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                            <button
+                                onClick={editingLifestyleGoal ? updateLifestyleGoal : addLifestyleGoal}
+                                className='flex-1 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
                                 {editingLifestyleGoal ? 'Update' : 'Save'}
                             </button>
                         </div>
@@ -2528,7 +2530,7 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
                                     className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
                                     rows={4}
                                 />
-                                <p className='text-xs text-muted-foreground mt-1'>Enter key metrics as JSON. Example: {"weekly_workouts": "4 days", "sleep": "8 hours"}</p>
+                                <p className='mt-1 text-xs text-muted-foreground'>Enter key metrics as JSON. Example: {`{"weekly_workouts": "4 days", "sleep": "8 hours"}`}</p>
                             </div>
                         </div>
                         <div className='mt-6 flex gap-2'>

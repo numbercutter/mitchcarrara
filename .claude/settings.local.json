@@ -6,7 +6,8 @@
       "Bash(move payments companies )",
       "Bash(move support companies)",
       "Bash(mv:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(bun run build:*)"
     ],
     "deny": []
   }

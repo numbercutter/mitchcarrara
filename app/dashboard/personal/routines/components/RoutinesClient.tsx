@@ -91,7 +91,7 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                     <h2 className='text-xl font-semibold'>{dayNames[selectedDay]} Routines</h2>
                     {selectedDayRoutines.length > 0 && (
                         <div className='text-sm text-muted-foreground'>
-                            {selectedDayRoutines.reduce((total, routine) => total + routine.items.reduce((sum, item) => sum + (item.duration_minutes || 0), 0), 0)} minutes total
+                            {selectedDayRoutines.reduce((total, routine) => total + routine.items.reduce((sum, item) => sum + (item.duration || 0), 0), 0)} minutes total
                         </div>
                     )}
                 </div>
@@ -104,7 +104,7 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                                     <div className='flex items-center justify-between'>
                                         <h3 className='text-lg font-semibold'>{routine.name}</h3>
                                         <div className='flex items-center gap-2'>
-                                            <span className='text-sm text-muted-foreground'>{routine.items.reduce((sum, item) => sum + (item.duration_minutes || 0), 0)} min</span>
+                                            <span className='text-sm text-muted-foreground'>{routine.items.reduce((sum, item) => sum + (item.duration || 0), 0)} min</span>
                                             <button onClick={() => setEditingRoutine(routine.id)} className='rounded p-1 hover:bg-accent'>
                                                 <Edit3 className='h-4 w-4' />
                                             </button>
@@ -113,7 +113,6 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                                             </button>
                                         </div>
                                     </div>
-                                    {routine.description && <p className='mt-2 text-muted-foreground'>{routine.description}</p>}
                                 </div>
 
                                 {/* Routine Items */}
@@ -137,7 +136,7 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                                                         <div className='flex items-center gap-2'>
                                                             <div className='flex items-center gap-1 text-sm text-muted-foreground'>
                                                                 <Clock className='h-4 w-4' />
-                                                                {item.duration_minutes} min
+                                                                {item.duration} min
                                                             </div>
                                                             <button
                                                                 onClick={() => deleteRoutineItem(item.id)}
@@ -188,7 +187,7 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                     {dayNames.map((day, index) => {
                         const dayRoutines = routines.filter((routine) => routine.day_of_week === index && routine.is_active);
                         const totalItems = dayRoutines.reduce((sum, routine) => sum + routine.items.length, 0);
-                        const totalDuration = dayRoutines.reduce((sum, routine) => sum + routine.items.reduce((itemSum, item) => itemSum + (item.duration_minutes || 0), 0), 0);
+                        const totalDuration = dayRoutines.reduce((sum, routine) => sum + routine.items.reduce((itemSum, item) => itemSum + (item.duration || 0), 0), 0);
 
                         return (
                             <div key={index} className='rounded-lg border bg-card p-4'>

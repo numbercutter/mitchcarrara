@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { CompanyConfig } from '@/config/companies';
+
 import { Database, Tables } from '@/types/database';
 
 // Type helpers
@@ -22,8 +22,8 @@ type RoutineItem = Tables<'routine_items'>;
 // TASKS QUERIES
 // =============================================
 
-export async function getTasks(company: CompanyConfig, userId: string): Promise<Task[]> {
-    const supabase = await createClient(company);
+export async function getTasks(userId: string): Promise<Task[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
@@ -35,8 +35,8 @@ export async function getTasks(company: CompanyConfig, userId: string): Promise<
     return data || [];
 }
 
-export async function getTaskChatMessages(company: CompanyConfig, userId: string): Promise<TaskChatMessage[]> {
-    const supabase = await createClient(company);
+export async function getTaskChatMessages(userId: string): Promise<TaskChatMessage[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('task_chat_messages').select('*').eq('user_id', userId).order('created_at', { ascending: true });
 
@@ -48,8 +48,8 @@ export async function getTaskChatMessages(company: CompanyConfig, userId: string
     return data || [];
 }
 
-export async function getCalendarEvents(company: CompanyConfig, userId: string): Promise<CalendarEvent[]> {
-    const supabase = await createClient(company);
+export async function getCalendarEvents(userId: string): Promise<CalendarEvent[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('calendar_events').select('*').eq('user_id', userId).order('start_datetime', { ascending: true });
 
@@ -65,8 +65,8 @@ export async function getCalendarEvents(company: CompanyConfig, userId: string):
 // VISION QUERIES
 // =============================================
 
-export async function getVisionCards(company: CompanyConfig, userId: string): Promise<VisionCard[]> {
-    const supabase = await createClient(company);
+export async function getVisionCards(userId: string): Promise<VisionCard[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('vision_cards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
 
@@ -82,8 +82,8 @@ export async function getVisionCards(company: CompanyConfig, userId: string): Pr
 // PERSONAL QUERIES
 // =============================================
 
-export async function getHealthMetrics(company: CompanyConfig, userId: string, limit = 30): Promise<HealthMetric[]> {
-    const supabase = await createClient(company);
+export async function getHealthMetrics(userId: string, limit = 30): Promise<HealthMetric[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('health_metrics').select('*').eq('user_id', userId).order('metric_date', { ascending: false }).limit(limit);
 
@@ -95,8 +95,8 @@ export async function getHealthMetrics(company: CompanyConfig, userId: string, l
     return data || [];
 }
 
-export async function getWorkoutLogs(company: CompanyConfig, userId: string, limit = 10): Promise<WorkoutLog[]> {
-    const supabase = await createClient(company);
+export async function getWorkoutLogs(userId: string, limit = 10): Promise<WorkoutLog[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('workout_logs').select('*').eq('user_id', userId).order('workout_date', { ascending: false }).limit(limit);
 
@@ -108,8 +108,8 @@ export async function getWorkoutLogs(company: CompanyConfig, userId: string, lim
     return data || [];
 }
 
-export async function getBooks(company: CompanyConfig, userId: string): Promise<Book[]> {
-    const supabase = await createClient(company);
+export async function getBooks(userId: string): Promise<Book[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('books').select('*').eq('user_id', userId).order('start_date', { ascending: false });
 
@@ -121,8 +121,8 @@ export async function getBooks(company: CompanyConfig, userId: string): Promise<
     return data || [];
 }
 
-export async function getCourses(company: CompanyConfig, userId: string): Promise<Course[]> {
-    const supabase = await createClient(company);
+export async function getCourses(userId: string): Promise<Course[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('courses').select('*').eq('user_id', userId).order('start_date', { ascending: false });
 
@@ -134,8 +134,8 @@ export async function getCourses(company: CompanyConfig, userId: string): Promis
     return data || [];
 }
 
-export async function getContacts(company: CompanyConfig, userId: string): Promise<Contact[]> {
-    const supabase = await createClient(company);
+export async function getContacts(userId: string): Promise<Contact[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('contacts').select('*').eq('user_id', userId).order('name', { ascending: true });
 
@@ -147,8 +147,8 @@ export async function getContacts(company: CompanyConfig, userId: string): Promi
     return data || [];
 }
 
-export async function getRecentPersonalActivities(company: CompanyConfig, userId: string, limit = 10): Promise<PersonalActivity[]> {
-    const supabase = await createClient(company);
+export async function getRecentPersonalActivities(userId: string, limit = 10): Promise<PersonalActivity[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('personal_activities').select('*').eq('user_id', userId).order('activity_date', { ascending: false }).limit(limit);
 
@@ -160,8 +160,8 @@ export async function getRecentPersonalActivities(company: CompanyConfig, userId
     return data || [];
 }
 
-export async function getMeals(company: CompanyConfig, userId: string, limit = 20): Promise<Meal[]> {
-    const supabase = await createClient(company);
+export async function getMeals(userId: string, limit = 20): Promise<Meal[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('meals').select('*').eq('user_id', userId).order('meal_date', { ascending: false }).limit(limit);
 
@@ -173,8 +173,8 @@ export async function getMeals(company: CompanyConfig, userId: string, limit = 2
     return data || [];
 }
 
-export async function getSupplements(company: CompanyConfig, userId: string): Promise<Supplement[]> {
-    const supabase = await createClient(company);
+export async function getSupplements(userId: string): Promise<Supplement[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('supplements').select('*').eq('user_id', userId).eq('is_active', true).order('name', { ascending: true });
 
@@ -186,8 +186,8 @@ export async function getSupplements(company: CompanyConfig, userId: string): Pr
     return data || [];
 }
 
-export async function getDailyRoutines(company: CompanyConfig, userId: string): Promise<DailyRoutine[]> {
-    const supabase = await createClient(company);
+export async function getDailyRoutines(userId: string): Promise<DailyRoutine[]> {
+    const supabase = await createClient();
 
     const { data, error } = await supabase.from('daily_routines').select('*').eq('user_id', userId).eq('is_active', true).order('name', { ascending: true });
 
@@ -199,10 +199,10 @@ export async function getDailyRoutines(company: CompanyConfig, userId: string): 
     return data || [];
 }
 
-export async function getRoutineItems(company: CompanyConfig, routineId: string): Promise<RoutineItem[]> {
-    const supabase = await createClient(company);
+export async function getRoutineItems(userId: string, routineId: string): Promise<RoutineItem[]> {
+    const supabase = await createClient();
 
-    const { data, error } = await supabase.from('routine_items').select('*').eq('routine_id', routineId).order('sort_order', { ascending: true });
+    const { data, error } = await supabase.from('routine_items').select('*').eq('routine_id', routineId).eq('user_id', userId).order('sort_order', { ascending: true });
 
     if (error) {
         console.error('Error fetching routine items:', error);
@@ -216,15 +216,15 @@ export async function getRoutineItems(company: CompanyConfig, routineId: string)
 // AGGREGATE DATA FUNCTIONS
 // =============================================
 
-export async function getPersonalDashboardData(company: CompanyConfig, userId: string) {
+export async function getPersonalDashboardData(userId: string) {
     const [healthMetrics, workoutLogs, books, courses, recentActivities, meals, supplements] = await Promise.all([
-        getHealthMetrics(company, userId, 7), // Last 7 days
-        getWorkoutLogs(company, userId, 5), // Last 5 workouts
-        getBooks(company, userId),
-        getCourses(company, userId),
-        getRecentPersonalActivities(company, userId, 5),
-        getMeals(company, userId, 10), // Last 10 meals
-        getSupplements(company, userId),
+        getHealthMetrics(userId, 7), // Last 7 days
+        getWorkoutLogs(userId, 5), // Last 5 workouts
+        getBooks(userId),
+        getCourses(userId),
+        getRecentPersonalActivities(userId, 5),
+        getMeals(userId, 10), // Last 10 meals
+        getSupplements(userId),
     ]);
 
     return {
@@ -238,8 +238,8 @@ export async function getPersonalDashboardData(company: CompanyConfig, userId: s
     };
 }
 
-export async function getTasksDashboardData(company: CompanyConfig, userId: string) {
-    const [tasks, chatMessages, calendarEvents] = await Promise.all([getTasks(company, userId), getTaskChatMessages(company, userId), getCalendarEvents(company, userId)]);
+export async function getTasksDashboardData(userId: string) {
+    const [tasks, chatMessages, calendarEvents] = await Promise.all([getTasks(userId), getTaskChatMessages(userId), getCalendarEvents(userId)]);
 
     return {
         tasks,
@@ -248,8 +248,8 @@ export async function getTasksDashboardData(company: CompanyConfig, userId: stri
     };
 }
 
-export async function getVisionDashboardData(company: CompanyConfig, userId: string) {
-    const visionCards = await getVisionCards(company, userId);
+export async function getVisionDashboardData(userId: string) {
+    const visionCards = await getVisionCards(userId);
 
     return {
         visionCards,

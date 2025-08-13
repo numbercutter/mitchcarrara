@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
-import { updateVisionCard, deleteVisionCard } from '@/lib/database/actions';
 import { TablesUpdate } from '@/types/database';
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { company } = await getDatabaseContext();
+        const { supabase } = await getDatabaseContext();
         const body = await request.json();
-        const cardId = params.id;
+        const { id: cardId } = await params;
 
         const updateData: TablesUpdate<'vision_cards'> = {};
 
@@ -18,28 +17,38 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         if (body.position_x !== undefined) updateData.position_x = body.position_x;
         if (body.position_y !== undefined) updateData.position_y = body.position_y;
 
-        const result = await updateVisionCard(company, cardId, updateData);
+        const { data, error } = await supabase
+            .from('vision_cards')
+            .update({
+                ...updateData,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', cardId)
+            .select()
+            .single();
 
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+        if (error) {
+            console.error('Error updating vision card:', error);
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        return NextResponse.json(result.data);
+        return NextResponse.json(data);
     } catch (error) {
         console.error('Error updating vision card:', error);
         return NextResponse.json({ error: 'Failed to update vision card' }, { status: 500 });
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { company } = await getDatabaseContext();
-        const cardId = params.id;
+        const { supabase } = await getDatabaseContext();
+        const { id: cardId } = await params;
 
-        const result = await deleteVisionCard(company, cardId);
+        const { error } = await supabase.from('vision_cards').delete().eq('id', cardId);
 
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+        if (error) {
+            console.error('Error deleting vision card:', error);
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
         return NextResponse.json({ success: true });

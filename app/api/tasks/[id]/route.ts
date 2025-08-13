@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
-import { updateTask, deleteTask } from '@/lib/database/actions';
 import { TablesUpdate } from '@/types/database';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { company } = await getDatabaseContext();
+        const { supabase } = await getDatabaseContext();
         const body = await request.json();
         const { id: taskId } = await params;
 
@@ -21,13 +20,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (body.estimate !== undefined) updateData.estimate = body.estimate;
         if (body.labels !== undefined) updateData.labels = body.labels;
 
-        const result = await updateTask(company, taskId, updateData);
+        const { data, error } = await supabase
+            .from('tasks')
+            .update({
+                ...updateData,
+                updated_at: new Date().toISOString(),
+            })
+            .eq('id', taskId)
+            .select()
+            .single();
 
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+        if (error) {
+            console.error('Error updating task:', error);
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        return NextResponse.json(result.data);
+        return NextResponse.json(data);
     } catch (error) {
         console.error('Error updating task:', error);
         return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
@@ -36,13 +44,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { company } = await getDatabaseContext();
+        const { supabase } = await getDatabaseContext();
         const { id: taskId } = await params;
 
-        const result = await deleteTask(company, taskId);
+        const { error } = await supabase.from('tasks').delete().eq('id', taskId);
 
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+        if (error) {
+            console.error('Error deleting task:', error);
+            return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
         return NextResponse.json({ success: true });

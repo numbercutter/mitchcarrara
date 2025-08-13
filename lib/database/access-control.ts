@@ -83,7 +83,7 @@ export async function grantUserAccess(granteeEmail: string, accessLevel: AccessL
 
     // Find the grantee's user ID by email
     const { data: granteeUser } = await supabase.auth.admin.listUsers();
-    const grantee = granteeUser.users.find((user) => user.email === granteeEmail);
+    const grantee = granteeUser?.users?.find((user: any) => user?.email === granteeEmail);
 
     if (!grantee) {
         return { success: false, message: 'User not found with that email' };
