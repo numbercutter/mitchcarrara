@@ -26,12 +26,14 @@ export async function GET(request: Request) {
 
                 console.log('Auth successful, redirecting to:', next);
 
+                // Force mitchcarrara.com in production
                 if (isLocalEnv) {
                     return NextResponse.redirect(`${origin}${next}`);
-                } else if (forwardedHost) {
+                } else if (forwardedHost?.includes('mitchcarrara.com')) {
                     return NextResponse.redirect(`https://${forwardedHost}${next}`);
                 } else {
-                    return NextResponse.redirect(`${origin}${next}`);
+                    // Force redirect to mitchcarrara.com
+                    return NextResponse.redirect(`https://mitchcarrara.com${next}`);
                 }
             } else {
                 console.error('Auth exchange failed:', error);
@@ -52,7 +54,14 @@ export async function GET(request: Request) {
 
             if (!error && data.user) {
                 console.log('PKCE Magic link auth successful, redirecting to:', next);
-                return NextResponse.redirect(`${origin}${next}`);
+                const isLocalEnv = process.env.NODE_ENV === 'development';
+
+                if (isLocalEnv) {
+                    return NextResponse.redirect(`${origin}${next}`);
+                } else {
+                    // Force redirect to mitchcarrara.com
+                    return NextResponse.redirect(`https://mitchcarrara.com${next}`);
+                }
             } else {
                 console.error('PKCE Magic link verification failed:', error);
             }
@@ -62,5 +71,11 @@ export async function GET(request: Request) {
     }
 
     console.log('Auth failed, redirecting to error page');
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+    const isLocalEnv = process.env.NODE_ENV === 'development';
+
+    if (isLocalEnv) {
+        return NextResponse.redirect(`${origin}/auth/auth-code-error`);
+    } else {
+        return NextResponse.redirect(`https://mitchcarrara.com/auth/auth-code-error`);
+    }
 }

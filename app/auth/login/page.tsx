@@ -8,7 +8,7 @@ function useSignInWithEmail() {
     const supabase = createClient();
 
     return async (email: string) => {
-        const redirectURL = getURL('/api/auth/callback?next=/dashboard');
+        const redirectURL = process.env.NODE_ENV === 'development' ? getURL('/api/auth/callback?next=/dashboard') : 'https://mitchcarrara.com/api/auth/callback?next=/dashboard';
 
         const { error } = await supabase.auth.signInWithOtp({
             email,

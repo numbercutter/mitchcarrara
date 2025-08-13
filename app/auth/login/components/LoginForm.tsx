@@ -24,10 +24,15 @@ export default function LoginForm() {
         const supabase = createClient();
 
         try {
+            const redirectUrl =
+                process.env.NODE_ENV === 'development'
+                    ? `${window.location.origin}/api/auth/callback?next=/dashboard/personal`
+                    : `https://mitchcarrara.com/api/auth/callback?next=/dashboard/personal`;
+
             const { error } = await supabase.auth.signInWithOtp({
                 email,
                 options: {
-                    emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard/personal`,
+                    emailRedirectTo: redirectUrl,
                     shouldCreateUser: true,
                 },
             });
