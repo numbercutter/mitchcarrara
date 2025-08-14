@@ -5,35 +5,29 @@ export async function GET() {
     try {
         const { supabase, userId } = await getDatabaseContext();
         
-        // Check what data exists for this user ID
+        // Get actual data and count manually
         const [healthMetrics, workoutLogs, books, meals, supplements] = await Promise.all([
-            supabase.from('health_metrics').select('count').eq('user_id', userId).single(),
-            supabase.from('workout_logs').select('count').eq('user_id', userId).single(), 
-            supabase.from('books').select('count').eq('user_id', userId).single(),
-            supabase.from('meals').select('count').eq('user_id', userId).single(),
-            supabase.from('supplements').select('count').eq('user_id', userId).single(),
-        ]);
-
-        // Also get a sample of actual data
-        const sampleData = await Promise.all([
-            supabase.from('health_metrics').select('*').eq('user_id', userId).limit(3),
-            supabase.from('books').select('*').eq('user_id', userId).limit(3),
-            supabase.from('meals').select('*').eq('user_id', userId).limit(3),
+            supabase.from('health_metrics').select('*').eq('user_id', userId),
+            supabase.from('workout_logs').select('*').eq('user_id', userId),
+            supabase.from('books').select('*').eq('user_id', userId),
+            supabase.from('meals').select('*').eq('user_id', userId),
+            supabase.from('supplements').select('*').eq('user_id', userId),
         ]);
         
         return NextResponse.json({
             userId_being_queried: userId,
             data_counts: {
-                health_metrics: healthMetrics.count,
-                workout_logs: workoutLogs.count, 
-                books: books.count,
-                meals: meals.count,
-                supplements: supplements.count,
+                health_metrics: healthMetrics.data?.length || 0,
+                workout_logs: workoutLogs.data?.length || 0,
+                books: books.data?.length || 0,
+                meals: meals.data?.length || 0,
+                supplements: supplements.data?.length || 0,
             },
             sample_data: {
-                health_metrics: sampleData[0].data,
-                books: sampleData[1].data,
-                meals: sampleData[2].data,
+                health_metrics: healthMetrics.data?.slice(0, 3),
+                books: books.data?.slice(0, 3),
+                meals: meals.data?.slice(0, 3),
+                supplements: supplements.data?.slice(0, 3),
             },
             errors: {
                 health_metrics: healthMetrics.error?.message,
