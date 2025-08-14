@@ -44,7 +44,7 @@ export default function UserContextIndicator() {
         <div className='flex items-center gap-2'>
             <Badge variant='secondary' className='flex items-center gap-1'>
                 <Eye className='h-3 w-3' />
-                Viewing {context.dataOwnerEmail.split('@')[0]}'s data
+                Viewing {context.dataOwnerEmail?.split('@')[0] || 'user'}'s data
             </Badge>
         </div>
     );
