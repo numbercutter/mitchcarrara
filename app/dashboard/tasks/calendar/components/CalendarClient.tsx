@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, User, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, User, Calendar, CheckSquare } from 'lucide-react';
 import type { Tables } from '@/types/database';
 
 type CalendarEvent = Tables<'calendar_events'>;
+type Task = Tables<'tasks'>;
 
 interface CalendarClientProps {
     initialEvents: CalendarEvent[];
+    initialTasks: Task[];
 }
 
 const eventTypeColors = {
@@ -16,13 +18,18 @@ const eventTypeColors = {
     deadline: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
     reminder: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
     personal: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
+    'task-todo': 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300',
+    'task-in-progress': 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
+    'task-done': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300',
 };
 
-export default function CalendarClient({ initialEvents }: CalendarClientProps) {
+export default function CalendarClient({ initialEvents, initialTasks }: CalendarClientProps) {
     const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
+    const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
     const [showEventForm, setShowEventForm] = useState(false);
+    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [eventForm, setEventForm] = useState({
         title: '',
         description: '',
@@ -46,6 +53,22 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
             priority: 'medium',
         });
         setShowEventForm(false);
+        setEditingEvent(null);
+    };
+
+    const editEvent = (event: CalendarEvent) => {
+        setEditingEvent(event);
+        setEventForm({
+            title: event.title,
+            description: event.description || '',
+            event_type: event.event_type,
+            start_datetime: event.start_datetime,
+            end_datetime: event.end_datetime,
+            location: event.location || '',
+            assignee: event.assignee,
+            priority: event.priority,
+        });
+        setShowEventForm(true);
     };
 
     const saveEvent = async () => {
@@ -58,28 +81,47 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
         }
 
         try {
-            const response = await fetch('/api/calendar-events', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: eventForm.title,
-                    description: eventForm.description || null,
-                    event_type: eventForm.event_type,
-                    start_datetime: eventForm.start_datetime,
-                    end_datetime: eventForm.end_datetime, // This is required, not nullable
-                    location: eventForm.location || null,
-                    assignee: eventForm.assignee,
-                    priority: eventForm.priority,
-                }),
-            });
+            const eventData = {
+                title: eventForm.title,
+                description: eventForm.description || null,
+                event_type: eventForm.event_type,
+                start_datetime: eventForm.start_datetime,
+                end_datetime: eventForm.end_datetime,
+                location: eventForm.location || null,
+                assignee: eventForm.assignee,
+                priority: eventForm.priority,
+            };
 
-            if (!response.ok) throw new Error('Failed to create event');
+            let response;
+            if (editingEvent) {
+                // Update existing event
+                response = await fetch(`/api/calendar-events/${editingEvent.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(eventData),
+                });
 
-            const newEvent = await response.json();
-            setEvents((prev) => [...prev, newEvent]);
+                if (!response.ok) throw new Error('Failed to update event');
+
+                const updatedEvent = await response.json();
+                setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? updatedEvent : e)));
+            } else {
+                // Create new event
+                response = await fetch('/api/calendar-events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(eventData),
+                });
+
+                if (!response.ok) throw new Error('Failed to create event');
+
+                const newEvent = await response.json();
+                setEvents((prev) => [...prev, newEvent]);
+            }
+
             resetForm();
         } catch (error) {
-            console.error('Error creating event:', error);
+            console.error('Error saving event:', error);
         }
     };
 
@@ -107,16 +149,31 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
         return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
     });
 
+    // Filter tasks for current month based on due_date or created_at
+    const monthTasks = tasks.filter((task) => {
+        const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+        return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
+    });
+
     // Group events by date
     const eventsByDate = monthEvents.reduce(
         (acc, event) => {
             const dateKey = new Date(event.start_datetime).toDateString();
             if (!acc[dateKey]) acc[dateKey] = [];
-            acc[dateKey].push(event);
+            acc[dateKey].push({ ...event, type: 'event' });
             return acc;
         },
-        {} as Record<string, CalendarEvent[]>
+        {} as Record<string, any[]>
     );
+
+    // Group tasks by date and add to the same structure
+    const itemsByDate = monthTasks.reduce((acc, task) => {
+        const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+        const dateKey = taskDate.toDateString();
+        if (!acc[dateKey]) acc[dateKey] = [];
+        acc[dateKey].push({ ...task, type: 'task' });
+        return acc;
+    }, eventsByDate);
 
     const navigateMonth = (direction: 'prev' | 'next') => {
         setCurrentDate((prev) => {
@@ -147,8 +204,8 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(currentYear, currentMonth, day);
         const dateKey = date.toDateString();
-        const dayEvents = eventsByDate[dateKey] || [];
-        calendarDays.push({ day, date, events: dayEvents });
+        const dayItems = itemsByDate[dateKey] || [];
+        calendarDays.push({ day, date, events: dayItems });
     }
 
     return (
@@ -221,11 +278,30 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
                                             </span>
                                         </div>
                                         <div className='space-y-1'>
-                                            {dayData.events.slice(0, 3).map((event) => {
-                                                const typeColor = eventTypeColors[event.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
+                                            {dayData.events.slice(0, 3).map((item) => {
+                                                let typeColor;
+                                                let title;
+                                                let icon = null;
+
+                                                if (item.type === 'event') {
+                                                    typeColor = eventTypeColors[item.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
+                                                    title = item.title;
+                                                } else {
+                                                    // It's a task
+                                                    const status = item.status || 'todo';
+                                                    typeColor = eventTypeColors[`task-${status}` as keyof typeof eventTypeColors] || eventTypeColors['task-todo'];
+                                                    title = item.title;
+                                                    icon = <CheckSquare className='mr-1 inline h-3 w-3' />;
+                                                }
+
                                                 return (
-                                                    <div key={event.id} className={`truncate rounded p-1 text-xs ${typeColor}`} title={event.title}>
-                                                        {event.title}
+                                                    <div
+                                                        key={`${item.type}-${item.id}`}
+                                                        className={`cursor-pointer truncate rounded p-1 text-xs hover:opacity-80 ${typeColor}`}
+                                                        title={`${item.type === 'task' ? 'Task: ' : 'Event: '}${title}`}
+                                                        onClick={() => (item.type === 'event' ? editEvent(item) : null)}>
+                                                        {icon}
+                                                        {title}
                                                     </div>
                                                 );
                                             })}
@@ -241,53 +317,110 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
 
             {viewMode === 'list' && (
                 <div className='space-y-4'>
-                    {monthEvents.length > 0 ? (
-                        monthEvents.map((event) => {
-                            const typeColor = eventTypeColors[event.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
-                            return (
-                                <div key={event.id} className='rounded-lg border bg-card p-6'>
-                                    <div className='flex items-start justify-between'>
-                                        <div className='flex-1'>
-                                            <div className='mb-2 flex items-center gap-3'>
-                                                <span className={`rounded px-2 py-1 text-xs ${typeColor}`}>{event.event_type}</span>
-                                                <h3 className='font-semibold'>{event.title}</h3>
-                                            </div>
-                                            {event.description && <p className='mb-3 text-muted-foreground'>{event.description}</p>}
-                                            <div className='flex items-center gap-4 text-sm text-muted-foreground'>
-                                                <div className='flex items-center gap-1'>
-                                                    <Calendar className='h-4 w-4' />
-                                                    {new Date(event.start_datetime).toLocaleDateString()}
+                    {monthEvents.length > 0 || monthTasks.length > 0 ? (
+                        <>
+                            {/* Events */}
+                            {monthEvents.map((event) => {
+                                const typeColor = eventTypeColors[event.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
+                                return (
+                                    <div key={event.id} className='rounded-lg border bg-card p-6 transition-shadow hover:shadow-md'>
+                                        <div className='flex items-start justify-between'>
+                                            <div className='flex-1 cursor-pointer' onClick={() => editEvent(event)}>
+                                                <div className='mb-2 flex items-center gap-3'>
+                                                    <span className={`rounded px-2 py-1 text-xs ${typeColor}`}>{event.event_type}</span>
+                                                    <h3 className='font-semibold hover:text-primary'>{event.title}</h3>
                                                 </div>
-                                                {event.start_datetime && (
+                                                {event.description && <p className='mb-3 text-muted-foreground'>{event.description}</p>}
+                                                <div className='flex items-center gap-4 text-sm text-muted-foreground'>
                                                     <div className='flex items-center gap-1'>
-                                                        <Clock className='h-4 w-4' />
-                                                        {event.start_datetime}
-                                                        {event.end_datetime && ` - ${event.end_datetime}`}
+                                                        <Calendar className='h-4 w-4' />
+                                                        {new Date(event.start_datetime).toLocaleDateString()}
                                                     </div>
-                                                )}
-                                                {event.location && (
-                                                    <div className='flex items-center gap-1'>
-                                                        <MapPin className='h-4 w-4' />
-                                                        {event.location}
-                                                    </div>
-                                                )}
-                                                {event.assignee && (
-                                                    <div className='flex items-center gap-1'>
-                                                        <User className='h-4 w-4' />
-                                                        <span className='capitalize'>{event.assignee}</span>
-                                                    </div>
-                                                )}
+                                                    {event.start_datetime && (
+                                                        <div className='flex items-center gap-1'>
+                                                            <Clock className='h-4 w-4' />
+                                                            {new Date(event.start_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            {event.end_datetime &&
+                                                                ` - ${new Date(event.end_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                                                        </div>
+                                                    )}
+                                                    {event.location && (
+                                                        <div className='flex items-center gap-1'>
+                                                            <MapPin className='h-4 w-4' />
+                                                            {event.location}
+                                                        </div>
+                                                    )}
+                                                    {event.assignee && (
+                                                        <div className='flex items-center gap-1'>
+                                                            <User className='h-4 w-4' />
+                                                            <span className='capitalize'>{event.assignee}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className='ml-4 flex items-center gap-2'>
+                                                <button
+                                                    onClick={() => editEvent(event)}
+                                                    className='rounded p-2 text-muted-foreground hover:bg-secondary hover:text-primary'
+                                                    title='Edit event'>
+                                                    <Clock className='h-4 w-4' />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteEvent(event.id)}
+                                                    className='rounded p-2 text-muted-foreground hover:bg-red-50 hover:text-red-600'
+                                                    title='Delete event'>
+                                                    ✕
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })
+                                );
+                            })}
+
+                            {/* Tasks */}
+                            {monthTasks.map((task) => {
+                                const status = task.status || 'todo';
+                                const typeColor = eventTypeColors[`task-${status}` as keyof typeof eventTypeColors] || eventTypeColors['task-todo'];
+                                const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+
+                                return (
+                                    <div key={`task-${task.id}`} className='rounded-lg border border-l-4 border-l-blue-500 bg-card p-6 transition-shadow hover:shadow-md'>
+                                        <div className='flex items-start justify-between'>
+                                            <div className='flex-1'>
+                                                <div className='mb-2 flex items-center gap-3'>
+                                                    <CheckSquare className='h-4 w-4' />
+                                                    <span className={`rounded px-2 py-1 text-xs ${typeColor}`}>Task - {status}</span>
+                                                    <h3 className='font-semibold'>{task.title}</h3>
+                                                </div>
+                                                {task.description && <p className='mb-3 text-muted-foreground'>{task.description}</p>}
+                                                <div className='flex items-center gap-4 text-sm text-muted-foreground'>
+                                                    <div className='flex items-center gap-1'>
+                                                        <Calendar className='h-4 w-4' />
+                                                        {task.due_date ? `Due: ${taskDate.toLocaleDateString()}` : `Created: ${taskDate.toLocaleDateString()}`}
+                                                    </div>
+                                                    {task.priority && (
+                                                        <div className='flex items-center gap-1'>
+                                                            <span className='capitalize'>{task.priority} priority</span>
+                                                        </div>
+                                                    )}
+                                                    {task.assignee && (
+                                                        <div className='flex items-center gap-1'>
+                                                            <User className='h-4 w-4' />
+                                                            <span className='capitalize'>{task.assignee}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
                     ) : (
                         <div className='py-12 text-center'>
                             <Calendar className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                            <h3 className='mb-2 text-lg font-semibold'>No Events This Month</h3>
-                            <p className='mb-4 text-muted-foreground'>Add your first event to get started.</p>
+                            <h3 className='mb-2 text-lg font-semibold'>No Events or Tasks This Month</h3>
+                            <p className='mb-4 text-muted-foreground'>Add your first event or create tasks to get started.</p>
                             <button onClick={() => setShowEventForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
                                 Add Event
                             </button>
@@ -300,7 +433,7 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
             {showEventForm && (
                 <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
                     <div className='w-full max-w-md rounded-lg bg-card p-6'>
-                        <h3 className='mb-4 text-lg font-semibold'>Add New Event</h3>
+                        <h3 className='mb-4 text-lg font-semibold'>{editingEvent ? 'Edit Event' : 'Add New Event'}</h3>
                         <div className='space-y-4'>
                             <div>
                                 <label className='mb-2 block text-sm font-medium'>Title *</label>
@@ -383,7 +516,7 @@ export default function CalendarClient({ initialEvents }: CalendarClientProps) {
                                 Cancel
                             </button>
                             <button onClick={saveEvent} className='flex-1 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                                Save Event
+                                {editingEvent ? 'Update Event' : 'Save Event'}
                             </button>
                         </div>
                     </div>
