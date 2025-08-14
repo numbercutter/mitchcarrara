@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag } from 'lucide-react';
 import type { Tables } from '@/types/database';
 
 type Task = Tables<'tasks'>;
@@ -19,18 +19,29 @@ const statusConfig = {
 };
 
 const priorityConfig = {
-    low: { label: 'Low', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
-    medium: { label: 'Medium', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300' },
-    high: { label: 'High', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300' },
-    urgent: { label: 'Urgent', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300' },
+    low: { label: 'Low', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300', sort: 1 },
+    medium: { label: 'Medium', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300', sort: 2 },
+    high: { label: 'High', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300', sort: 3 },
+    urgent: { label: 'Urgent', color: 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300', sort: 4 },
 };
+
+type SortField = 'title' | 'status' | 'priority' | 'updated_at' | 'created_at' | 'due_date';
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+    field: SortField;
+    direction: SortDirection;
+}
 
 export default function TaskManageClient({ initialTasks }: TaskManageClientProps) {
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
+    const [selectedPriority, setSelectedPriority] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'updated_at', direction: 'desc' });
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
@@ -181,40 +192,101 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         }
     };
 
-    const filteredTasks = tasks.filter((task) => {
-        const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesStatus = selectedStatus === 'all' || task.status === selectedStatus;
-        return matchesSearch && matchesStatus;
-    });
+    const handleSort = (field: SortField) => {
+        const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
+        setSortConfig({ field, direction });
+    };
 
-    const groupedTasks = filteredTasks.reduce(
-        (acc, task) => {
-            const status = task.status || 'todo';
-            if (!acc[status]) acc[status] = [];
-            acc[status].push(task);
-            return acc;
-        },
-        {} as Record<string, Task[]>
-    );
+    const toggleTaskSelection = (taskId: string) => {
+        const newSelected = new Set(selectedTasks);
+        if (newSelected.has(taskId)) {
+            newSelected.delete(taskId);
+        } else {
+            newSelected.add(taskId);
+        }
+        setSelectedTasks(newSelected);
+    };
+
+    const toggleAllTasks = () => {
+        if (selectedTasks.size === filteredAndSortedTasks.length) {
+            setSelectedTasks(new Set());
+        } else {
+            setSelectedTasks(new Set(filteredAndSortedTasks.map(t => t.id)));
+        }
+    };
+
+    const filteredAndSortedTasks = useMemo(() => {
+        let filtered = tasks.filter((task) => {
+            const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                task.description?.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesStatus = selectedStatus === 'all' || task.status === selectedStatus;
+            const matchesPriority = selectedPriority === 'all' || task.priority === selectedPriority;
+            return matchesSearch && matchesStatus && matchesPriority;
+        });
+
+        // Sort tasks
+        filtered.sort((a, b) => {
+            const { field, direction } = sortConfig;
+            let aValue: any, bValue: any;
+
+            switch (field) {
+                case 'title':
+                    aValue = a.title.toLowerCase();
+                    bValue = b.title.toLowerCase();
+                    break;
+                case 'status':
+                    aValue = a.status || 'todo';
+                    bValue = b.status || 'todo';
+                    break;
+                case 'priority':
+                    aValue = priorityConfig[a.priority as keyof typeof priorityConfig]?.sort || 0;
+                    bValue = priorityConfig[b.priority as keyof typeof priorityConfig]?.sort || 0;
+                    break;
+                case 'updated_at':
+                    aValue = new Date(a.updated_at).getTime();
+                    bValue = new Date(b.updated_at).getTime();
+                    break;
+                case 'created_at':
+                    aValue = new Date(a.created_at).getTime();
+                    bValue = new Date(b.created_at).getTime();
+                    break;
+                case 'due_date':
+                    aValue = a.due_date ? new Date(a.due_date).getTime() : 0;
+                    bValue = b.due_date ? new Date(b.due_date).getTime() : 0;
+                    break;
+                default:
+                    aValue = a.updated_at;
+                    bValue = b.updated_at;
+            }
+
+            if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [tasks, searchQuery, selectedStatus, selectedPriority, sortConfig]);
 
     return (
-        <div className='flex h-full flex-col'>
+        <div className='flex h-full flex-col min-h-0'>
             {/* Sticky Header */}
             <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
                 {/* Header */}
                 <div className='flex items-center justify-between'>
                     <div>
                         <h1 className='text-3xl font-bold'>Task Management</h1>
-                        <p className='text-muted-foreground'>Organize and track your tasks efficiently</p>
+                        <p className='text-muted-foreground'>Comprehensive task tracking and management</p>
                     </div>
-                    <button onClick={() => setShowNewTaskForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                    <button 
+                        onClick={() => setShowNewTaskForm(true)} 
+                        className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
                         <Plus className='h-4 w-4' />
                         New Task
                     </button>
                 </div>
 
-                {/* Search and Filters */}
-                <div className='mt-6 flex gap-4'>
+                {/* Filters and Search */}
+                <div className='mt-6 flex items-center gap-4'>
                     <div className='relative flex-1'>
                         <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
                         <input
@@ -225,129 +297,211 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                             className='w-full rounded-md border py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary'
                         />
                     </div>
+                    
                     <select
                         value={selectedStatus}
                         onChange={(e) => setSelectedStatus(e.target.value)}
-                        className='rounded-md border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
+                        className='rounded-md border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
                         <option value='all'>All Status</option>
-                        <option value='backlog'>Backlog</option>
-                        <option value='todo'>Todo</option>
-                        <option value='in-progress'>In Progress</option>
-                        <option value='in-review'>In Review</option>
-                        <option value='done'>Done</option>
+                        {Object.entries(statusConfig).map(([status, config]) => (
+                            <option key={status} value={status}>{config.label}</option>
+                        ))}
+                    </select>
+                    
+                    <select
+                        value={selectedPriority}
+                        onChange={(e) => setSelectedPriority(e.target.value)}
+                        className='rounded-md border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
+                        <option value='all'>All Priority</option>
+                        {Object.entries(priorityConfig).map(([priority, config]) => (
+                            <option key={priority} value={priority}>{config.label}</option>
+                        ))}
                     </select>
                 </div>
 
-                {/* Task Stats */}
-            <div className='grid gap-4 md:grid-cols-4'>
-                {Object.entries(statusConfig).map(([status, config]) => {
-                    const count = tasks.filter((task) => task.status === status).length;
-                    const Icon = config.icon;
-                    return (
-                        <div key={status} className={`rounded-lg border p-4 ${config.bg}`}>
-                            <div className='flex items-center gap-2'>
-                                <Icon className={`h-5 w-5 ${config.color}`} />
-                                <span className='font-medium'>{config.label}</span>
-                            </div>
-                            <p className='mt-2 text-2xl font-bold'>{count}</p>
-                        </div>
-                    );
-                })}
+                {/* Task count */}
+                <div className='mt-4 text-sm text-muted-foreground'>
+                    {filteredAndSortedTasks.length} of {tasks.length} tasks
+                    {selectedTasks.size > 0 && ` • ${selectedTasks.size} selected`}
                 </div>
             </div>
-            
+
             {/* Scrollable Content */}
-            <div className='flex-1 overflow-y-auto pt-6'>
-            {/* Task Kanban Board */}
-            <div className='grid gap-6 lg:grid-cols-4'>
-                {Object.entries(statusConfig).map(([status, config]) => {
-                    const tasksInStatus = groupedTasks[status] || [];
-                    const Icon = config.icon;
-
-                    return (
-                        <div key={status} className='space-y-4'>
-                            <div className='flex items-center gap-2'>
-                                <Icon className={`h-5 w-5 ${config.color}`} />
-                                <h3 className='font-semibold'>{config.label}</h3>
-                                <span className='text-sm text-muted-foreground'>({tasksInStatus.length})</span>
-                            </div>
-
-                            <div className='space-y-3'>
-                                {tasksInStatus.map((task) => {
-                                    const priorityStyle = priorityConfig[task.priority as keyof typeof priorityConfig];
+            <div className='flex-1 overflow-y-auto pt-6 min-h-0'>
+                {filteredAndSortedTasks.length > 0 ? (
+                    <table className='w-full'>
+                        <thead className='sticky top-0 bg-background/95 backdrop-blur-sm border-b'>
+                                <tr className='text-left'>
+                                    <th className='w-8 p-3'>
+                                        <input
+                                            type='checkbox'
+                                            checked={selectedTasks.size === filteredAndSortedTasks.length && filteredAndSortedTasks.length > 0}
+                                            onChange={toggleAllTasks}
+                                            className='rounded border border-input'
+                                        />
+                                    </th>
+                                    <th className='p-3 min-w-[300px]'>
+                                        <button 
+                                            onClick={() => handleSort('title')}
+                                            className='flex items-center gap-1 hover:text-primary font-medium'>
+                                            Task
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                    <th className='p-3 w-32'>
+                                        <button 
+                                            onClick={() => handleSort('status')}
+                                            className='flex items-center gap-1 hover:text-primary font-medium'>
+                                            Status
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                    <th className='p-3 w-24'>
+                                        <button 
+                                            onClick={() => handleSort('priority')}
+                                            className='flex items-center gap-1 hover:text-primary font-medium'>
+                                            Priority
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                    <th className='p-3 w-24'>Assignee</th>
+                                    <th className='p-3 w-32'>
+                                        <button 
+                                            onClick={() => handleSort('due_date')}
+                                            className='flex items-center gap-1 hover:text-primary font-medium'>
+                                            Due Date
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                    <th className='p-3 w-32'>
+                                        <button 
+                                            onClick={() => handleSort('updated_at')}
+                                            className='flex items-center gap-1 hover:text-primary font-medium'>
+                                            Updated
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                    <th className='p-3 w-16'>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredAndSortedTasks.map((task) => {
+                                    const status = task.status || 'todo';
+                                    const statusConfig_ = statusConfig[status as keyof typeof statusConfig];
+                                    const priorityConfig_ = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
+                                    const StatusIcon = statusConfig_?.icon || Circle;
+                                    const isSelected = selectedTasks.has(task.id);
 
                                     return (
-                                        <div key={task.id} className='rounded-lg border bg-card p-4 transition-shadow hover:shadow-md'>
-                                            <div className='mb-3 flex items-start justify-between'>
-                                                <h4 className='line-clamp-2 font-medium'>{task.title}</h4>
+                                        <tr 
+                                            key={task.id} 
+                                            className={`border-b hover:bg-secondary/20 transition-colors ${isSelected ? 'bg-primary/5' : ''}`}>
+                                            <td className='p-3'>
+                                                <input
+                                                    type='checkbox'
+                                                    checked={isSelected}
+                                                    onChange={() => toggleTaskSelection(task.id)}
+                                                    className='rounded border border-input'
+                                                />
+                                            </td>
+                                            <td className='p-3'>
+                                                <div className='space-y-1'>
+                                                    <div className='font-medium text-sm'>{task.title}</div>
+                                                    {task.description && (
+                                                        <div className='text-xs text-muted-foreground line-clamp-2'>
+                                                            {task.description}
+                                                        </div>
+                                                    )}
+                                                    {task.labels && task.labels.length > 0 && (
+                                                        <div className='flex flex-wrap gap-1 mt-1'>
+                                                            {task.labels.slice(0, 3).map((label, index) => (
+                                                                <span key={index} className='rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary'>
+                                                                    {label}
+                                                                </span>
+                                                            ))}
+                                                            {task.labels.length > 3 && (
+                                                                <span className='text-xs text-muted-foreground'>+{task.labels.length - 3}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className='p-3'>
+                                                <div className='flex items-center gap-2'>
+                                                    <StatusIcon className={`h-3 w-3 ${statusConfig_?.color}`} />
+                                                    <span className='text-sm'>{statusConfig_?.label}</span>
+                                                </div>
+                                            </td>
+                                            <td className='p-3'>
+                                                <span className={`px-2 py-1 text-xs rounded-full ${priorityConfig_.color}`}>
+                                                    {priorityConfig_.label}
+                                                </span>
+                                            </td>
+                                            <td className='p-3'>
+                                                <div className='flex items-center gap-2'>
+                                                    <User className='h-3 w-3 text-muted-foreground' />
+                                                    <span className='text-sm capitalize'>{task.assignee}</span>
+                                                </div>
+                                            </td>
+                                            <td className='p-3'>
+                                                {task.due_date ? (
+                                                    <div className='flex items-center gap-2'>
+                                                        <Calendar className='h-3 w-3 text-muted-foreground' />
+                                                        <span className='text-sm'>
+                                                            {new Date(task.due_date).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className='text-sm text-muted-foreground'>No date</span>
+                                                )}
+                                            </td>
+                                            <td className='p-3'>
+                                                <span className='text-sm text-muted-foreground'>
+                                                    {new Date(task.updated_at).toLocaleDateString()}
+                                                </span>
+                                            </td>
+                                            <td className='p-3'>
                                                 <div className='flex items-center gap-1'>
-                                                    <button onClick={() => openEditForm(task)} className='rounded p-1 hover:bg-accent'>
+                                                    <button 
+                                                        onClick={() => openEditForm(task)}
+                                                        className='rounded p-1.5 hover:bg-secondary transition-colors'>
                                                         <Edit3 className='h-3 w-3' />
                                                     </button>
-                                                    <button onClick={() => deleteTask(task.id)} className='rounded p-1 text-destructive hover:bg-accent'>
+                                                    <button 
+                                                        onClick={() => deleteTask(task.id)}
+                                                        className='rounded p-1.5 hover:bg-secondary text-destructive transition-colors'>
                                                         <Trash2 className='h-3 w-3' />
                                                     </button>
                                                 </div>
-                                            </div>
-
-                                            {task.description && <p className='mb-3 line-clamp-2 text-sm text-muted-foreground'>{task.description}</p>}
-
-                                            <div className='flex items-center justify-between'>
-                                                <div className='flex items-center gap-2'>
-                                                    <span className={`rounded px-2 py-1 text-xs ${priorityStyle.color}`}>{priorityStyle.label}</span>
-                                                    <div className='flex items-center gap-1 text-sm text-muted-foreground'>
-                                                        <User className='h-3 w-3' />
-                                                        <span className='capitalize'>{task.assignee}</span>
-                                                    </div>
-                                                </div>
-                                                {task.due_date && <span className='text-xs text-muted-foreground'>{new Date(task.due_date).toLocaleDateString()}</span>}
-                                            </div>
-
-                                            {task.labels && task.labels.length > 0 && (
-                                                <div className='mt-3 flex flex-wrap gap-1'>
-                                                    {task.labels.map((label, index) => (
-                                                        <span key={index} className='rounded bg-primary/10 px-2 py-1 text-xs text-primary'>
-                                                            {label}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {task.estimate && <div className='mt-3 text-xs text-muted-foreground'>Estimate: {task.estimate}</div>}
-                                        </div>
+                                            </td>
+                                        </tr>
                                     );
                                 })}
-
-                                {tasksInStatus.length === 0 && (
-                                    <div className='py-8 text-center text-muted-foreground'>
-                                        <Circle className='mx-auto mb-2 h-8 w-8 opacity-50' />
-                                        <p className='text-sm'>No tasks</p>
-                                    </div>
-                                )}
+                            </tbody>
+                    </table>
+                ) : (
+                    <div className='flex-1 flex items-center justify-center'>
+                        {tasks.length === 0 ? (
+                            <div className='text-center'>
+                                <CheckCircle2 className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
+                                <h3 className='mb-2 text-lg font-semibold'>No Tasks Yet</h3>
+                                <p className='mb-4 text-muted-foreground'>Create your first task to get started.</p>
+                                <button 
+                                    onClick={() => setShowNewTaskForm(true)} 
+                                    className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                                    Create Your First Task
+                                </button>
                             </div>
-                        </div>
-                    );
-                })}
+                        ) : (
+                            <div className='text-center'>
+                                <Search className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
+                                <h3 className='mb-2 text-lg font-semibold'>No Tasks Found</h3>
+                                <p className='text-muted-foreground'>No tasks match your current filters.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
-
-            {filteredTasks.length === 0 && tasks.length > 0 && (
-                <div className='py-12 text-center'>
-                    <Search className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                    <h3 className='mb-2 text-lg font-semibold'>No Tasks Found</h3>
-                    <p className='text-muted-foreground'>No tasks match your search criteria.</p>
-                </div>
-            )}
-
-            {tasks.length === 0 && (
-                <div className='py-12 text-center'>
-                    <Circle className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                    <h3 className='mb-2 text-lg font-semibold'>No Tasks Yet</h3>
-                    <p className='mb-4 text-muted-foreground'>Create your first task to get started.</p>
-                    <button onClick={() => setShowNewTaskForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                        Create Your First Task
-                    </button>
-                </div>
-            )}
 
             {/* Task Form Modal */}
             {showNewTaskForm && (
@@ -484,7 +638,6 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                     </div>
                 </div>
             )}
-            </div>
         </div>
     );
 }

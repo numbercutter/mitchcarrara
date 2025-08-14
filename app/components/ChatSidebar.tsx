@@ -39,9 +39,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     const [showHistory, setShowHistory] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [hasNewMessages, setHasNewMessages] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const lastMessageCountRef = useRef<number>(0);
 
     // Fetch conversations from database
     const fetchConversations = async () => {
@@ -70,6 +72,13 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             const response = await fetch(`/api/chat/conversations/${threadId}/messages`);
             if (response.ok) {
                 const newMessages = await response.json();
+
+                // Check for new messages when sidebar is closed
+                if (!isOpen && newMessages.length > lastMessageCountRef.current) {
+                    setHasNewMessages(true);
+                }
+
+                lastMessageCountRef.current = newMessages.length;
                 setMessages(newMessages);
             }
         } catch (error) {
@@ -100,6 +109,22 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         }
     };
 
+    // Get or create today's conversation
+    const getTodaysConversation = async () => {
+        const todayTitle = `Chat - ${new Date().toLocaleDateString()}`;
+        const existingThread = threads.find((t) => t.title === todayTitle);
+
+        if (existingThread) {
+            setCurrentThreadId(existingThread.id);
+            setShowHistory(false);
+            return existingThread;
+        } else {
+            const newConversation = await createTodaysConversation();
+            setShowHistory(false);
+            return newConversation;
+        }
+    };
+
     // Poll for new messages every minute
     const startPolling = (threadId: string) => {
         // Clear existing interval
@@ -127,7 +152,17 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     // Initialize chat when sidebar opens
     useEffect(() => {
         if (isOpen) {
-            fetchConversations();
+            setHasNewMessages(false); // Clear notifications when opening
+            fetchConversations().then(() => {
+                // Auto-select today's conversation if no thread is selected
+                if (!currentThreadId) {
+                    const todayTitle = `Chat - ${new Date().toLocaleDateString()}`;
+                    const todaysThread = threads.find((t) => t.title === todayTitle);
+                    if (todaysThread) {
+                        setCurrentThreadId(todaysThread.id);
+                    }
+                }
+            });
         }
     }, [isOpen]);
 
@@ -242,6 +277,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                 className='fixed bottom-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90'
                 title='Open Chat'>
                 <MessageSquare className='h-6 w-6' />
+                {hasNewMessages && (
+                    <div className='absolute -right-1 -top-1 flex h-4 w-4 animate-pulse items-center justify-center rounded-full bg-red-500'>
+                        <span className='text-xs font-bold text-white'>!</span>
+                    </div>
+                )}
             </button>
         );
     }
@@ -252,7 +292,8 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             <div className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden ${isOpen ? '' : 'hidden'}`} onClick={onToggle} />
 
             {/* Chat Sidebar */}
-            <div className='fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
+            <div
+                className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-transform duration-300 dark:shadow-[0_0_15px_rgba(0,0,0,0.3)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 {/* Header */}
                 <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
                     <div className='flex items-center gap-3'>
@@ -260,6 +301,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                         <span className='font-semibold text-foreground'>{showHistory ? 'Chat History' : 'Assistant Chat'}</span>
                     </div>
                     <div className='flex items-center gap-2'>
+                        <button
+                            onClick={getTodaysConversation}
+                            className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
+                            title="Today's Chat">
+                            <Plus className='h-4 w-4' />
+                        </button>
                         <button
                             onClick={() => setShowHistory(!showHistory)}
                             className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
@@ -300,24 +347,30 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
                         {/* Thread List */}
                         <div className='flex-1 space-y-3 overflow-y-auto p-4'>
-                            {filteredThreads.map((thread) => (
-                                <div
-                                    key={thread.id}
-                                    onClick={() => switchToThread(thread.id)}
-                                    className={`cursor-pointer rounded-lg border p-3 transition-colors hover:bg-secondary/50 ${
-                                        thread.id === currentThreadId ? 'border-primary bg-primary/10' : 'border-border/50'
-                                    }`}>
-                                    <div className='mb-2 flex items-center justify-between'>
-                                        <h3 className='truncate text-sm font-medium text-foreground'>{thread.title}</h3>
-                                        <span className='text-xs text-muted-foreground'>{thread.messageCount || 0} msgs</span>
+                            {filteredThreads.map((thread) => {
+                                const isToday = thread.title === `Chat - ${new Date().toLocaleDateString()}`;
+                                return (
+                                    <div
+                                        key={thread.id}
+                                        onClick={() => switchToThread(thread.id)}
+                                        className={`cursor-pointer rounded-lg border p-3 transition-colors hover:bg-secondary/50 ${
+                                            thread.id === currentThreadId ? 'border-primary bg-primary/10' : 'border-border/50'
+                                        } ${isToday ? 'ring-2 ring-primary/20' : ''}`}>
+                                        <div className='mb-2 flex items-center justify-between'>
+                                            <div className='flex items-center gap-2'>
+                                                <h3 className='truncate text-sm font-medium text-foreground'>{thread.title}</h3>
+                                                {isToday && <span className='rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary'>Today</span>}
+                                            </div>
+                                            <span className='text-xs text-muted-foreground'>{thread.messageCount || 0} msgs</span>
+                                        </div>
+                                        <div className='flex items-center gap-2 text-xs text-muted-foreground'>
+                                            <Calendar className='h-3 w-3' />
+                                            <span>{formatDate(thread.updated_at)}</span>
+                                            <span>{formatTime(thread.updated_at)}</span>
+                                        </div>
                                     </div>
-                                    <div className='flex items-center gap-2 text-xs text-muted-foreground'>
-                                        <Calendar className='h-3 w-3' />
-                                        <span>{formatDate(thread.updated_at)}</span>
-                                        <span>{formatTime(thread.updated_at)}</span>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             {filteredThreads.length === 0 && (
                                 <div className='py-8 text-center text-muted-foreground'>
                                     <Archive className='mx-auto mb-2 h-8 w-8' />
