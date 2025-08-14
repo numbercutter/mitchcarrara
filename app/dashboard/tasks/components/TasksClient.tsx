@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, Clock, Users, CheckSquare, AlertCircle, ArrowRight, Circle, CircleCheckBig, CircleDot, BarChart3, PieChart, Activity, Target, Settings } from 'lucide-react';
 import { Tables } from '@/types/database';
 import { formatTimeAgo, getPriorityColor, getStatusColor } from '@/lib/database/utils';
@@ -9,8 +9,26 @@ import Link from 'next/link';
 // Type helpers
 type Task = Tables<'tasks'>;
 
+interface TimeStats {
+    thisWeek: {
+        totalHours: number;
+        dailyHours: number[];
+        mostWorkedTask: string | null;
+        mostWorkedHours: number;
+        mostProductiveDay?: string;
+    };
+    lastWeek: {
+        totalHours: number;
+    };
+    comparison?: {
+        hoursDifference: number;
+        percentageChange: number;
+    };
+}
+
 interface TasksClientProps {
     initialTasks: Task[];
+    initialTimeStats?: TimeStats | null;
 }
 
 const statusConfig = {
@@ -21,8 +39,10 @@ const statusConfig = {
     done: { label: 'Done', icon: CircleCheckBig, color: 'text-green-500', bgColor: 'bg-green-50 dark:bg-green-900/20' },
 };
 
-export default function TasksClient({ initialTasks }: TasksClientProps) {
+export default function TasksClient({ initialTasks, initialTimeStats }: TasksClientProps) {
     const [tasks] = useState<Task[]>(initialTasks);
+    const [timeStats, setTimeStats] = useState<TimeStats | null>(initialTimeStats || null);
+    const [isLoadingTimeStats, setIsLoadingTimeStats] = useState(false);
 
     const getTasksByStatus = (status: string) => {
         return tasks.filter((task) => task.status === status || (status === 'todo' && !task.status));
@@ -50,6 +70,31 @@ export default function TasksClient({ initialTasks }: TasksClientProps) {
     const recentTasks = tasks
         .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
         .slice(0, 5);
+
+    // Fetch real time tracking data
+    useEffect(() => {
+        const fetchTimeStats = async () => {
+            setIsLoadingTimeStats(true);
+            try {
+                const response = await fetch('/api/time-entries/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    setTimeStats(data);
+                }
+            } catch (error) {
+                console.error('Error fetching time stats:', error);
+            } finally {
+                setIsLoadingTimeStats(false);
+            }
+        };
+
+        fetchTimeStats();
+    }, []);
+    
+    const weeklyProgress = timeStats?.thisWeek?.totalHours ? 
+        Math.round((timeStats.thisWeek.totalHours / 40) * 100) : 0; // Assuming 40h work week
+
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; // Start with Sunday as API returns
 
     return (
         <div className='flex h-full flex-col min-h-0'>
@@ -96,20 +141,115 @@ export default function TasksClient({ initialTasks }: TasksClientProps) {
                     <div className='rounded-lg border bg-card p-6'>
                         <div className='flex items-center justify-between'>
                             <div>
-                                <p className='text-sm font-medium text-muted-foreground'>Completed</p>
-                                <p className='text-3xl font-bold'>{taskStats.done}</p>
+                                <p className='text-sm font-medium text-muted-foreground'>This Week</p>
+                                <p className='text-3xl font-bold'>
+                                    {isLoadingTimeStats ? '...' : `${(timeStats?.thisWeek?.totalHours || 0).toFixed(1)}h`}
+                                </p>
+                                <p className='text-xs text-muted-foreground mt-1'>
+                                    {timeStats?.comparison ? (
+                                        <>
+                                            {timeStats.comparison.hoursDifference >= 0 ? '+' : ''}
+                                            {timeStats.comparison.hoursDifference.toFixed(1)}h from last week
+                                        </>
+                                    ) : (
+                                        'No comparison data'
+                                    )}
+                                </p>
                             </div>
-                            <CheckSquare className='h-8 w-8 text-green-500' />
+                            <Clock className='h-8 w-8 text-purple-500' />
                         </div>
                     </div>
                     
                     <div className='rounded-lg border bg-card p-6'>
                         <div className='flex items-center justify-between'>
                             <div>
-                                <p className='text-sm font-medium text-muted-foreground'>Completion Rate</p>
-                                <p className='text-3xl font-bold'>{completionRate}%</p>
+                                <p className='text-sm font-medium text-muted-foreground'>Weekly Progress</p>
+                                <p className='text-3xl font-bold'>{weeklyProgress}%</p>
+                                <p className='text-xs text-muted-foreground mt-1'>of 40h target</p>
                             </div>
                             <TrendingUp className='h-8 w-8 text-blue-500' />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Time Tracking Section */}
+                <div className='grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8'>
+                    <div className='lg:col-span-2 rounded-lg border bg-card p-6'>
+                        <h3 className='mb-4 text-lg font-semibold flex items-center gap-2'>
+                            <BarChart3 className='h-5 w-5' />
+                            Daily Hours This Week
+                        </h3>
+                        <div className='space-y-3'>
+                            {dayLabels.map((day, index) => {
+                                const hours = timeStats?.thisWeek?.dailyHours?.[index] || 0;
+                                const maxHours = timeStats?.thisWeek?.dailyHours ? Math.max(...timeStats.thisWeek.dailyHours) : 0;
+                                const percentage = maxHours > 0 ? (hours / maxHours) * 100 : 0;
+                                
+                                return (
+                                    <div key={day} className='flex items-center gap-3'>
+                                        <div className='w-12 text-sm font-medium'>{day}</div>
+                                        <div className='flex-1 bg-gray-200 rounded-full h-3 dark:bg-gray-700'>
+                                            <div 
+                                                className='bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-300' 
+                                                style={{ width: `${percentage}%` }}
+                                            />
+                                        </div>
+                                        <div className='w-12 text-sm font-bold text-right'>
+                                            {isLoadingTimeStats ? '...' : (hours > 0 ? `${hours.toFixed(1)}h` : '-')}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className='rounded-lg border bg-card p-6'>
+                        <h3 className='mb-4 text-lg font-semibold flex items-center gap-2'>
+                            <Target className='h-5 w-5' />
+                            Top Task This Week
+                        </h3>
+                        <div className='space-y-4'>
+                            {timeStats?.thisWeek?.mostWorkedTask ? (
+                                <div className='p-4 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20'>
+                                    <h4 className='font-medium text-foreground mb-2'>{timeStats.thisWeek.mostWorkedTask}</h4>
+                                    <div className='flex items-center justify-between'>
+                                        <span className='text-2xl font-bold text-purple-600 dark:text-purple-400'>
+                                            {timeStats.thisWeek.mostWorkedHours.toFixed(1)}h
+                                        </span>
+                                        <span className='text-sm text-muted-foreground'>
+                                            {timeStats.thisWeek.totalHours > 0 ? 
+                                                Math.round((timeStats.thisWeek.mostWorkedHours / timeStats.thisWeek.totalHours) * 100) 
+                                                : 0}% of total
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className='p-4 rounded-lg bg-gray-50 dark:bg-gray-900/20'>
+                                    <p className='text-sm text-muted-foreground text-center'>
+                                        {isLoadingTimeStats ? 'Loading...' : 'No time tracked yet this week'}
+                                    </p>
+                                </div>
+                            )}
+                            
+                            <div className='pt-4 border-t border-border/50'>
+                                <p className='text-sm text-muted-foreground mb-2'>Quick Stats</p>
+                                <div className='space-y-2 text-sm'>
+                                    <div className='flex justify-between'>
+                                        <span>Avg per day</span>
+                                        <span className='font-medium'>
+                                            {isLoadingTimeStats ? '...' : 
+                                                `${((timeStats?.thisWeek?.totalHours || 0) / 7).toFixed(1)}h`}
+                                        </span>
+                                    </div>
+                                    <div className='flex justify-between'>
+                                        <span>Most productive</span>
+                                        <span className='font-medium'>
+                                            {isLoadingTimeStats ? '...' : 
+                                                (timeStats?.thisWeek?.mostProductiveDay || 'No data')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

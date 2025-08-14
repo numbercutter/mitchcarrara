@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag, Play, Pause, Square } from 'lucide-react';
 import type { Tables } from '@/types/database';
 
 type Task = Tables<'tasks'>;
+
+// Extended task type with time tracking
+interface TaskWithTimeTracking extends Task {
+    total_time_logged?: number; // in minutes
+    active_timer?: {
+        start_time: string;
+        elapsed: number;
+    } | null;
+}
 
 interface TaskManageClientProps {
     initialTasks: Task[];
@@ -34,14 +43,20 @@ interface SortConfig {
 }
 
 export default function TaskManageClient({ initialTasks }: TaskManageClientProps) {
-    const [tasks, setTasks] = useState<Task[]>(initialTasks);
+    const [tasks, setTasks] = useState<TaskWithTimeTracking[]>(initialTasks.map(task => ({
+        ...task,
+        total_time_logged: 0,
+        active_timer: null
+    })));
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [selectedPriority, setSelectedPriority] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
-    const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [editingTask, setEditingTask] = useState<TaskWithTimeTracking | null>(null);
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'updated_at', direction: 'desc' });
+    const [activeTimers, setActiveTimers] = useState<Map<string, NodeJS.Timeout>>(new Map());
+    const timerUpdateInterval = useRef<NodeJS.Timeout | null>(null);
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
@@ -179,6 +194,9 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
     const deleteTask = async (id: string) => {
         if (!confirm('Are you sure you want to delete this task?')) return;
 
+        // Stop timer if running
+        stopTimer(id);
+
         try {
             const response = await fetch(`/api/tasks/${id}`, {
                 method: 'DELETE',
@@ -191,6 +209,137 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             console.error('Error deleting task:', error);
         }
     };
+
+    // Time tracking functions
+    const startTimer = (taskId: string) => {
+        const now = new Date().toISOString();
+        
+        setTasks(prev => prev.map(task => {
+            if (task.id === taskId) {
+                return {
+                    ...task,
+                    active_timer: {
+                        start_time: now,
+                        elapsed: 0
+                    }
+                };
+            }
+            // Stop other timers - only one timer at a time
+            if (task.active_timer) {
+                return {
+                    ...task,
+                    active_timer: null
+                };
+            }
+            return task;
+        }));
+
+        // Clear any existing timers
+        activeTimers.forEach(timer => clearInterval(timer));
+        activeTimers.clear();
+
+        // Start new timer that updates every second
+        const interval = setInterval(() => {
+            setTasks(prev => prev.map(task => {
+                if (task.id === taskId && task.active_timer) {
+                    const elapsed = Math.floor((Date.now() - new Date(task.active_timer.start_time).getTime()) / 1000);
+                    return {
+                        ...task,
+                        active_timer: {
+                            ...task.active_timer,
+                            elapsed
+                        }
+                    };
+                }
+                return task;
+            }));
+        }, 1000);
+
+        setActiveTimers(prev => new Map(prev).set(taskId, interval));
+    };
+
+    const stopTimer = (taskId: string) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task?.active_timer) return;
+
+        const totalSeconds = task.active_timer.elapsed;
+        const minutesToAdd = Math.floor(totalSeconds / 60);
+
+        setTasks(prev => prev.map(t => {
+            if (t.id === taskId) {
+                return {
+                    ...t,
+                    total_time_logged: (t.total_time_logged || 0) + minutesToAdd,
+                    active_timer: null
+                };
+            }
+            return t;
+        }));
+
+        // Clear the timer
+        const timer = activeTimers.get(taskId);
+        if (timer) {
+            clearInterval(timer);
+            setActiveTimers(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(taskId);
+                return newMap;
+            });
+        }
+
+        // TODO: Save time entry to database
+        if (minutesToAdd > 0) {
+            saveTimeEntry(taskId, minutesToAdd);
+        }
+    };
+
+    const saveTimeEntry = async (taskId: string, minutes: number) => {
+        try {
+            // This would save to a time_entries table
+            const response = await fetch('/api/time-entries', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_id: taskId,
+                    minutes,
+                    date: new Date().toISOString().split('T')[0]
+                })
+            });
+
+            if (!response.ok) {
+                console.error('Failed to save time entry');
+            }
+        } catch (error) {
+            console.error('Error saving time entry:', error);
+        }
+    };
+
+    const formatTime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const formatDuration = (minutes: number) => {
+        if (minutes < 60) {
+            return `${minutes}m`;
+        }
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    };
+
+    // Cleanup timers on unmount
+    useEffect(() => {
+        return () => {
+            activeTimers.forEach(timer => clearInterval(timer));
+        };
+    }, []);
 
     const handleSort = (field: SortField) => {
         const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
@@ -381,6 +530,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                             <ArrowUpDown className='h-3 w-3' />
                                         </button>
                                     </th>
+                                    <th className='p-3 w-32'>Time Tracked</th>
+                                    <th className='p-3 w-24'>Timer</th>
                                     <th className='p-3 w-16'>Actions</th>
                                 </tr>
                             </thead>
@@ -459,6 +610,41 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                                 <span className='text-sm text-muted-foreground'>
                                                     {new Date(task.updated_at).toLocaleDateString()}
                                                 </span>
+                                            </td>
+                                            <td className='p-3'>
+                                                <div className='text-sm'>
+                                                    {(task.total_time_logged || 0) > 0 ? (
+                                                        <span className='font-medium text-foreground'>
+                                                            {formatDuration(task.total_time_logged || 0)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className='text-muted-foreground'>No time</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className='p-3'>
+                                                <div className='flex items-center gap-1'>
+                                                    {task.active_timer ? (
+                                                        <>
+                                                            <div className='text-sm font-mono text-blue-600 dark:text-blue-400'>
+                                                                {formatTime(task.active_timer.elapsed)}
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => stopTimer(task.id)}
+                                                                className='rounded p-1 hover:bg-secondary text-red-600 transition-colors'
+                                                                title='Stop timer'>
+                                                                <Square className='h-3 w-3' />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => startTimer(task.id)}
+                                                            className='rounded p-1 hover:bg-secondary text-green-600 transition-colors'
+                                                            title='Start timer'>
+                                                            <Play className='h-3 w-3' />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className='p-3'>
                                                 <div className='flex items-center gap-1'>

@@ -1,15 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, User, Calendar, CheckSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, MapPin, User, Calendar, CheckSquare, Gift } from 'lucide-react';
 import type { Tables } from '@/types/database';
 
 type CalendarEvent = Tables<'calendar_events'>;
 type Task = Tables<'tasks'>;
+type Contact = {
+    id: string;
+    name: string;
+    birthday: string | null;
+    relationship: string | null;
+};
 
 interface CalendarClientProps {
     initialEvents: CalendarEvent[];
     initialTasks: Task[];
+    initialContacts: Contact[];
 }
 
 const eventTypeColors = {
@@ -18,14 +25,16 @@ const eventTypeColors = {
     deadline: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300',
     reminder: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300',
     personal: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
+    birthday: 'bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-300',
     'task-todo': 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300',
     'task-in-progress': 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300',
     'task-done': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300',
 };
 
-export default function CalendarClient({ initialEvents, initialTasks }: CalendarClientProps) {
+export default function CalendarClient({ initialEvents, initialTasks, initialContacts }: CalendarClientProps) {
     const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
+    const [contacts, setContacts] = useState<Contact[]>(initialContacts);
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
     const [showEventForm, setShowEventForm] = useState(false);
@@ -141,12 +150,37 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
         }
     };
 
+    // Generate birthday events for the current year
+    const generateBirthdayEvents = () => {
+        return contacts
+            .filter(contact => contact.birthday)
+            .map(contact => {
+                const birthdayDate = new Date(contact.birthday!);
+                const thisYearBirthday = new Date(currentYear, birthdayDate.getMonth(), birthdayDate.getDate());
+                
+                return {
+                    id: `birthday-${contact.id}`,
+                    type: 'birthday',
+                    title: `🎂 ${contact.name}'s Birthday`,
+                    description: `${contact.relationship ? `${contact.relationship} - ` : ''}Birthday celebration`,
+                    date: thisYearBirthday,
+                    contact: contact,
+                    event_type: 'birthday'
+                };
+            });
+    };
+
     // Filter events for current month
     const currentMonth = currentDate.getMonth();
     const currentYear = currentDate.getFullYear();
     const monthEvents = events.filter((event) => {
         const eventDate = new Date(event.start_datetime);
         return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear;
+    });
+
+    // Filter birthday events for current month
+    const birthdayEvents = generateBirthdayEvents().filter(birthday => {
+        return birthday.date.getMonth() === currentMonth && birthday.date.getFullYear() === currentYear;
     });
 
     // Filter tasks for current month based on due_date or created_at
@@ -166,6 +200,14 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
         {} as Record<string, any[]>
     );
 
+    // Add birthday events to the same structure
+    const eventsWithBirthdays = birthdayEvents.reduce((acc, birthday) => {
+        const dateKey = birthday.date.toDateString();
+        if (!acc[dateKey]) acc[dateKey] = [];
+        acc[dateKey].push(birthday);
+        return acc;
+    }, eventsByDate);
+
     // Group tasks by date and add to the same structure
     const itemsByDate = monthTasks.reduce((acc, task) => {
         const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
@@ -173,7 +215,7 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
         if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push({ ...task, type: 'task' });
         return acc;
-    }, eventsByDate);
+    }, eventsWithBirthdays);
 
     const navigateMonth = (direction: 'prev' | 'next') => {
         setCurrentDate((prev) => {
@@ -286,6 +328,10 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
                                                 if (item.type === 'event') {
                                                     typeColor = eventTypeColors[item.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
                                                     title = item.title;
+                                                } else if (item.type === 'birthday') {
+                                                    typeColor = eventTypeColors.birthday;
+                                                    title = item.title;
+                                                    icon = <Gift className='mr-1 inline h-3 w-3' />;
                                                 } else {
                                                     // It's a task
                                                     const status = item.status || 'todo';
@@ -298,7 +344,7 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
                                                     <div
                                                         key={`${item.type}-${item.id}`}
                                                         className={`cursor-pointer truncate rounded p-1 text-xs hover:opacity-80 ${typeColor}`}
-                                                        title={`${item.type === 'task' ? 'Task: ' : 'Event: '}${title}`}
+                                                        title={`${item.type === 'task' ? 'Task: ' : item.type === 'birthday' ? 'Birthday: ' : 'Event: '}${title}`}
                                                         onClick={() => (item.type === 'event' ? editEvent(item) : null)}>
                                                         {icon}
                                                         {title}
@@ -317,8 +363,36 @@ export default function CalendarClient({ initialEvents, initialTasks }: Calendar
 
             {viewMode === 'list' && (
                 <div className='space-y-4'>
-                    {monthEvents.length > 0 || monthTasks.length > 0 ? (
+                    {monthEvents.length > 0 || monthTasks.length > 0 || birthdayEvents.length > 0 ? (
                         <>
+                            {/* Birthday Events */}
+                            {birthdayEvents.map((birthday) => (
+                                <div key={birthday.id} className='rounded-lg border bg-card p-6 transition-shadow hover:shadow-md'>
+                                    <div className='flex items-start justify-between'>
+                                        <div className='flex-1'>
+                                            <div className='mb-2 flex items-center gap-3'>
+                                                <span className={`rounded px-2 py-1 text-xs ${eventTypeColors.birthday}`}>Birthday</span>
+                                                <h3 className='font-semibold flex items-center gap-2'>
+                                                    <Gift className='h-4 w-4' />
+                                                    {birthday.title}
+                                                </h3>
+                                            </div>
+                                            <p className='mb-3 text-muted-foreground'>{birthday.description}</p>
+                                            <div className='flex items-center gap-4 text-sm text-muted-foreground'>
+                                                <div className='flex items-center gap-1'>
+                                                    <Calendar className='h-4 w-4' />
+                                                    {birthday.date.toLocaleDateString()}
+                                                </div>
+                                                <div className='flex items-center gap-1'>
+                                                    <User className='h-4 w-4' />
+                                                    <span className='capitalize'>{birthday.contact.relationship || 'Contact'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+
                             {/* Events */}
                             {monthEvents.map((event) => {
                                 const typeColor = eventTypeColors[event.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
