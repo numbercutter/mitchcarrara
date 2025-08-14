@@ -7,7 +7,8 @@
       "Bash(move support companies)",
       "Bash(mv:*)",
       "Bash(rm:*)",
-      "Bash(bun run build:*)"
+      "Bash(bun run build:*)",
+      "Bash(bunx tsc:*)"
     ],
     "deny": []
   }

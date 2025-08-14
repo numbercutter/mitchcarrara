@@ -325,102 +325,102 @@ export default function DocumentsClient({ initialDocuments }: DocumentsClientPro
             
             {/* Scrollable Content */}
             <div className='flex-1 overflow-y-auto pt-6'>
-            {/* Documents Grid */
-            {filteredDocuments.length > 0 ? (
-                <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
-                    {filteredDocuments.map((document) => {
-                        const CategoryIcon = categoryIcons[document.category as keyof typeof categoryIcons] || FileText;
-                        const categoryColor = categoryColors[document.category as keyof typeof categoryColors];
+                {/* Documents Grid */}
+                {filteredDocuments.length > 0 ? (
+                    <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+                        {filteredDocuments.map((document) => {
+                            const CategoryIcon = categoryIcons[document.category as keyof typeof categoryIcons] || FileText;
+                            const categoryColor = categoryColors[document.category as keyof typeof categoryColors];
 
-                        return (
-                            <div key={document.id} className='rounded-lg border bg-card p-6 transition-shadow hover:shadow-md'>
-                                {/* Document Header */}
-                                <div className='mb-4 flex items-start justify-between'>
-                                    <div className='flex items-center gap-3'>
-                                        <div className={`rounded-lg p-2 ${categoryColor}`}>
-                                            <CategoryIcon className='h-5 w-5' />
-                                        </div>
-                                        <div>
-                                            <h3 className='font-semibold'>{document.title}</h3>
-                                            <p className='text-sm capitalize text-muted-foreground'>{document.category}</p>
-                                        </div>
-                                    </div>
-                                    <div className='flex items-center gap-1'>
-                                        {document.is_encrypted && <Lock className='h-4 w-4 text-green-600' />}
-                                        <button onClick={() => openEditForm(document)} className='rounded p-1 hover:bg-accent'>
-                                            <Edit3 className='h-4 w-4' />
-                                        </button>
-                                        <button onClick={() => deleteDocument(document.id)} className='rounded p-1 text-destructive hover:bg-accent'>
-                                            <Trash2 className='h-4 w-4' />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Document Fields */}
-                                <div className='space-y-3'>
-                                    {document.fields.map((field) => (
-                                        <div key={field.id} className='flex items-center justify-between rounded bg-accent/30 p-3'>
-                                            <div className='flex-1'>
-                                                <p className='text-sm font-medium'>{field.label}</p>
-                                                <p className='text-sm text-muted-foreground'>{field.is_secret && !visibleSecrets.has(field.id) ? '••••••••' : field.field_value}</p>
+                            return (
+                                <div key={document.id} className='rounded-lg border bg-card p-6 transition-shadow hover:shadow-md'>
+                                    {/* Document Header */}
+                                    <div className='mb-4 flex items-start justify-between'>
+                                        <div className='flex items-center gap-3'>
+                                            <div className={`rounded-lg p-2 ${categoryColor}`}>
+                                                <CategoryIcon className='h-5 w-5' />
                                             </div>
-                                            <div className='flex items-center gap-1'>
-                                                {field.is_secret && (
-                                                    <button onClick={() => toggleSecretVisibility(field.id)} className='rounded p-1 hover:bg-accent'>
-                                                        {visibleSecrets.has(field.id) ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                                            <div>
+                                                <h3 className='font-semibold'>{document.title}</h3>
+                                                <p className='text-sm capitalize text-muted-foreground'>{document.category}</p>
+                                            </div>
+                                        </div>
+                                        <div className='flex items-center gap-1'>
+                                            {document.is_encrypted && <Lock className='h-4 w-4 text-green-600' />}
+                                            <button onClick={() => openEditForm(document)} className='rounded p-1 hover:bg-accent'>
+                                                <Edit3 className='h-4 w-4' />
+                                            </button>
+                                            <button onClick={() => deleteDocument(document.id)} className='rounded p-1 text-destructive hover:bg-accent'>
+                                                <Trash2 className='h-4 w-4' />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Document Fields */}
+                                    <div className='space-y-3'>
+                                        {document.fields.map((field) => (
+                                            <div key={field.id} className='flex items-center justify-between rounded bg-accent/30 p-3'>
+                                                <div className='flex-1'>
+                                                    <p className='text-sm font-medium'>{field.label}</p>
+                                                    <p className='text-sm text-muted-foreground'>{field.is_secret && !visibleSecrets.has(field.id) ? '••••••••' : field.field_value}</p>
+                                                </div>
+                                                <div className='flex items-center gap-1'>
+                                                    {field.is_secret && (
+                                                        <button onClick={() => toggleSecretVisibility(field.id)} className='rounded p-1 hover:bg-accent'>
+                                                            {visibleSecrets.has(field.id) ? <EyeOff className='h-4 w-4' /> : <Eye className='h-4 w-4' />}
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => copyToClipboard(field.field_value)} className='rounded p-1 hover:bg-accent'>
+                                                        <Copy className='h-4 w-4' />
                                                     </button>
-                                                )}
-                                                <button onClick={() => copyToClipboard(field.field_value)} className='rounded p-1 hover:bg-accent'>
-                                                    <Copy className='h-4 w-4' />
-                                                </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Tags and Notes */}
+                                    {document.tags && document.tags.length > 0 && (
+                                        <div className='mt-4'>
+                                            <div className='flex flex-wrap gap-1'>
+                                                {document.tags.map((tag, index) => (
+                                                    <span key={index} className='rounded bg-primary/10 px-2 py-1 text-xs text-primary'>
+                                                        {tag}
+                                                    </span>
+                                                ))}
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {document.notes && <div className='mt-3 rounded bg-muted/50 p-3 text-sm'>{document.notes}</div>}
+
+                                    {document.expiry_date && <div className='mt-3 text-sm text-amber-600'>Expires: {new Date(document.expiry_date).toLocaleDateString()}</div>}
                                 </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className='py-12 text-center'>
+                        <Shield className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
+                        <h3 className='mb-2 text-lg font-semibold'>No Documents Found</h3>
+                        <p className='mb-4 text-muted-foreground'>
+                            {searchQuery || filterCategory !== 'all' ? 'No documents match your search criteria.' : 'Get started by adding your first secure document.'}
+                        </p>
+                        <button onClick={() => setShowDocumentForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                            Add Your First Document
+                        </button>
+                    </div>
+                )}
 
-                                {/* Tags and Notes */}
-                                {document.tags && document.tags.length > 0 && (
-                                    <div className='mt-4'>
-                                        <div className='flex flex-wrap gap-1'>
-                                            {document.tags.map((tag, index) => (
-                                                <span key={index} className='rounded bg-primary/10 px-2 py-1 text-xs text-primary'>
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {document.notes && <div className='mt-3 rounded bg-muted/50 p-3 text-sm'>{document.notes}</div>}
-
-                                {document.expiry_date && <div className='mt-3 text-sm text-amber-600'>Expires: {new Date(document.expiry_date).toLocaleDateString()}</div>}
-                            </div>
-                        );
-                    })}
-                </div>
-            ) : (
-                <div className='py-12 text-center'>
-                    <Shield className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                    <h3 className='mb-2 text-lg font-semibold'>No Documents Found</h3>
-                    <p className='mb-4 text-muted-foreground'>
-                        {searchQuery || filterCategory !== 'all' ? 'No documents match your search criteria.' : 'Get started by adding your first secure document.'}
-                    </p>
-                    <button onClick={() => setShowDocumentForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                        Add Your First Document
-                    </button>
-                </div>
-            )}
-
-            <DocumentForm
-                isOpen={showDocumentForm}
-                editingDocument={editingDocument}
-                documentForm={documentForm}
-                newTag={newTag}
-                setNewTag={setNewTag}
-                setDocumentForm={setDocumentForm}
-                onSave={saveDocument}
-                onCancel={resetForm}
-            />
+                <DocumentForm
+                    isOpen={showDocumentForm}
+                    editingDocument={editingDocument}
+                    documentForm={documentForm}
+                    newTag={newTag}
+                    setNewTag={setNewTag}
+                    setDocumentForm={setDocumentForm}
+                    onSave={saveDocument}
+                    onCancel={resetForm}
+                />
             </div>
         </div>
     );
