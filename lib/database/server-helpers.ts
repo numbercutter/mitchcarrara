@@ -28,15 +28,24 @@ export async function isAuthenticated(): Promise<boolean> {
 /**
  * Simplified database context for personal dashboard pages
  * Returns Supabase client and the appropriate user ID for data access
- * If user is an assistant, returns the primary owner's ID so they see owner's data
+ * Uses admin client for assistants to bypass RLS
  */
 export async function getDatabaseContext(): Promise<{
-    supabase: Awaited<ReturnType<typeof createClient>>;
+    supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof import('../supabase/admin-client').createAdminClient>;
     userId: string;
 }> {
-    const supabase = await createClient();
-    const { getDataOwnerUserId } = await import('./data-owner');
+    const { getDataOwnerUserId, isCurrentUserPrimaryOwner } = await import('./data-owner');
     const userId = await getDataOwnerUserId();
-
-    return { supabase, userId };
+    const isOwner = await isCurrentUserPrimaryOwner();
+    
+    if (isOwner) {
+        // Owner uses regular client (respects RLS)
+        const supabase = await createClient();
+        return { supabase, userId };
+    } else {
+        // Assistants use admin client (bypasses RLS)
+        const { createAdminClient } = await import('../supabase/admin-client');
+        const supabase = createAdminClient();
+        return { supabase, userId };
+    }
 }
