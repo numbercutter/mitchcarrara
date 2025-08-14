@@ -24,7 +24,13 @@ export async function GET() {
             return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
         }
 
-        const { data: profile } = await supabase.from('user_profiles').select('preferences').eq('user_id', currentUserId).single();
+        const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('preferences')
+            .eq('user_id', currentUserId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
 
         let sharedAccess = [];
         if (profile?.preferences) {
@@ -79,7 +85,13 @@ export async function POST(request: Request) {
         // Alternative approach: Store the email and when they log in, set up the shared access
 
         // Get current user's profile
-        const { data: currentProfile, error: profileError } = await supabase.from('user_profiles').select('preferences').eq('user_id', currentUserId).single();
+        const { data: currentProfile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('preferences')
+            .eq('user_id', currentUserId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
 
         if (profileError && profileError.code !== 'PGRST116') {
             // PGRST116 = no rows found
@@ -165,7 +177,13 @@ export async function DELETE(request: Request) {
         }
 
         // Get current user's profile
-        const { data: currentProfile } = await supabase.from('user_profiles').select('preferences').eq('user_id', currentUserId).single();
+        const { data: currentProfile } = await supabase
+            .from('user_profiles')
+            .select('preferences')
+            .eq('user_id', currentUserId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
 
         // Parse existing preferences
         let preferences: any = {};

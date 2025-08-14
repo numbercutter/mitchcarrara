@@ -189,44 +189,49 @@ export default function ContactsClient({ initialContacts }: ContactsClientProps)
     });
 
     return (
-        <div className='space-y-8'>
-            {/* Header */}
-            <div className='flex items-center justify-between'>
-                <div>
-                    <h1 className='text-3xl font-bold'>Contacts</h1>
-                    <p className='text-muted-foreground'>Manage your personal and professional contacts</p>
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                {/* Header */}
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className='text-3xl font-bold'>Contacts</h1>
+                        <p className='text-muted-foreground'>Manage your personal and professional contacts</p>
+                    </div>
+                    <button onClick={() => setShowContactForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                        <Plus className='h-4 w-4' />
+                        Add Contact
+                    </button>
                 </div>
-                <button onClick={() => setShowContactForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                    <Plus className='h-4 w-4' />
-                    Add Contact
-                </button>
-            </div>
 
-            {/* Search and Filters */}
-            <div className='flex gap-4'>
-                <div className='relative flex-1'>
-                    <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
-                    <input
-                        type='text'
-                        placeholder='Search contacts...'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className='w-full rounded-md border py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary'
-                    />
+                {/* Search and Filters */}
+                <div className='mt-6 flex gap-4'>
+                    <div className='relative flex-1'>
+                        <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
+                        <input
+                            type='text'
+                            placeholder='Search contacts...'
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className='w-full rounded-md border py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary'
+                        />
+                    </div>
+                    <select
+                        value={filterRelationship}
+                        onChange={(e) => setFilterRelationship(e.target.value)}
+                        className='rounded-md border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
+                        <option value='all'>All Relationships</option>
+                        <option value='family'>Family</option>
+                        <option value='friend'>Friend</option>
+                        <option value='colleague'>Colleague</option>
+                        <option value='business'>Business</option>
+                        <option value='other'>Other</option>
+                    </select>
                 </div>
-                <select
-                    value={filterRelationship}
-                    onChange={(e) => setFilterRelationship(e.target.value)}
-                    className='rounded-md border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
-                    <option value='all'>All Relationships</option>
-                    <option value='family'>Family</option>
-                    <option value='friend'>Friend</option>
-                    <option value='colleague'>Colleague</option>
-                    <option value='business'>Business</option>
-                    <option value='other'>Other</option>
-                </select>
             </div>
-
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-y-auto pt-6'>
             {/* Contacts Grid */}
             {filteredContacts.length > 0 ? (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
@@ -361,6 +366,7 @@ export default function ContactsClient({ initialContacts }: ContactsClientProps)
                 onAddTag={addTag}
                 onRemoveTag={removeTag}
             />
+            </div>
         </div>
     );
 }

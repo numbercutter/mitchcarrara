@@ -280,47 +280,52 @@ export default function DocumentsClient({ initialDocuments }: DocumentsClientPro
     });
 
     return (
-        <div className='space-y-8'>
-            {/* Header */}
-            <div className='flex items-center justify-between'>
-                <div>
-                    <h1 className='text-3xl font-bold'>Secure Documents</h1>
-                    <p className='text-muted-foreground'>Manage your important documents and credentials securely</p>
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                {/* Header */}
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className='text-3xl font-bold'>Secure Documents</h1>
+                        <p className='text-muted-foreground'>Manage your important documents and credentials securely</p>
+                    </div>
+                    <button onClick={() => setShowDocumentForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                        <Plus className='h-4 w-4' />
+                        Add Document
+                    </button>
                 </div>
-                <button onClick={() => setShowDocumentForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                    <Plus className='h-4 w-4' />
-                    Add Document
-                </button>
-            </div>
 
-            {/* Search and Filters */}
-            <div className='flex gap-4'>
-                <div className='relative flex-1'>
-                    <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
-                    <input
-                        type='text'
-                        placeholder='Search documents...'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className='w-full rounded-md border py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary'
-                    />
+                {/* Search and Filters */}
+                <div className='mt-6 flex gap-4'>
+                    <div className='relative flex-1'>
+                        <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
+                        <input
+                            type='text'
+                            placeholder='Search documents...'
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className='w-full rounded-md border py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-primary'
+                        />
+                    </div>
+                    <select
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className='rounded-md border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
+                        <option value='all'>All Categories</option>
+                        <option value='identity'>Identity</option>
+                        <option value='travel'>Travel</option>
+                        <option value='financial'>Financial</option>
+                        <option value='medical'>Medical</option>
+                        <option value='legal'>Legal</option>
+                        <option value='personal'>Personal</option>
+                        <option value='business'>Business</option>
+                    </select>
                 </div>
-                <select
-                    value={filterCategory}
-                    onChange={(e) => setFilterCategory(e.target.value)}
-                    className='rounded-md border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
-                    <option value='all'>All Categories</option>
-                    <option value='identity'>Identity</option>
-                    <option value='travel'>Travel</option>
-                    <option value='financial'>Financial</option>
-                    <option value='medical'>Medical</option>
-                    <option value='legal'>Legal</option>
-                    <option value='personal'>Personal</option>
-                    <option value='business'>Business</option>
-                </select>
             </div>
-
-            {/* Documents Grid */}
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-y-auto pt-6'>
+            {/* Documents Grid */
             {filteredDocuments.length > 0 ? (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
                     {filteredDocuments.map((document) => {
@@ -416,6 +421,7 @@ export default function DocumentsClient({ initialDocuments }: DocumentsClientPro
                 onSave={saveDocument}
                 onCancel={resetForm}
             />
+            </div>
         </div>
     );
 }

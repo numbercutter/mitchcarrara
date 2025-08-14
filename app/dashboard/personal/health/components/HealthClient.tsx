@@ -948,16 +948,18 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
     };
 
     return (
-        <div className='space-y-8'>
-            {/* Header */}
-            <div>
-                <h1 className='text-3xl font-bold'>Health & Fitness</h1>
-                <p className='text-muted-foreground'>Track your nutrition, supplements, workouts, and health metrics</p>
-            </div>
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                {/* Header */}
+                <div>
+                    <h1 className='text-3xl font-bold'>Health & Fitness</h1>
+                    <p className='text-muted-foreground'>Track your nutrition, supplements, workouts, and health metrics</p>
+                </div>
 
-            {/* Tab Navigation */}
-            <div className='border-b'>
-                <nav className='flex space-x-8'>
+                {/* Tab Navigation */}
+                <div className='mt-6 border-b'>
+                    <nav className='flex space-x-8'>
                     {[
                         { id: 'overview', label: 'Overview', icon: LayoutDashboard },
                         { id: 'diet', label: 'Diet', icon: Apple },
@@ -978,9 +980,12 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
                             </button>
                         );
                     })}
-                </nav>
+                    </nav>
+                </div>
             </div>
-
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-y-auto pt-6'>
             {/* Tab Content */}
             {activeTab === 'overview' && (
                 <div className='space-y-6'>
@@ -2618,6 +2623,7 @@ export default function HealthClient({ initialSupplements, initialMeals, initial
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }

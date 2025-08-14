@@ -58,35 +58,40 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
     const selectedDayRoutines = routines.filter((routine) => routine.day_of_week === selectedDay && routine.is_active);
 
     return (
-        <div className='space-y-8'>
-            {/* Header */}
-            <div className='flex items-center justify-between'>
-                <div>
-                    <h1 className='text-3xl font-bold'>Daily Routines</h1>
-                    <p className='text-muted-foreground'>Organize your daily activities and build productive habits</p>
-                </div>
-                <button onClick={() => setShowNewRoutineForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                    <Plus className='h-4 w-4' />
-                    New Routine
-                </button>
-            </div>
-
-            {/* Day Selector */}
-            <div className='flex gap-2 overflow-x-auto pb-2'>
-                {dayNames.map((day, index) => (
-                    <button
-                        key={index}
-                        onClick={() => setSelectedDay(index)}
-                        className={`flex-shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                            selectedDay === index ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
-                        }`}>
-                        {day}
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                {/* Header */}
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className='text-3xl font-bold'>Daily Routines</h1>
+                        <p className='text-muted-foreground'>Organize your daily activities and build productive habits</p>
+                    </div>
+                    <button onClick={() => setShowNewRoutineForm(true)} className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                        <Plus className='h-4 w-4' />
+                        New Routine
                     </button>
-                ))}
-            </div>
+                </div>
 
+                {/* Day Selector */}
+                <div className='mt-6 flex gap-2 overflow-x-auto pb-2'>
+                    {dayNames.map((day, index) => (
+                        <button
+                            key={index}
+                            onClick={() => setSelectedDay(index)}
+                            className={`flex-shrink-0 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                                selectedDay === index ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'
+                            }`}>
+                            {day}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-y-auto pt-6'>
             {/* Routines for Selected Day */}
-            <div className='space-y-6'>
+            <div className='space-y-6 pb-6'>
                 <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold'>{dayNames[selectedDay]} Routines</h2>
                     {selectedDayRoutines.length > 0 && (
@@ -231,6 +236,7 @@ export default function RoutinesClient({ initialRoutines }: RoutinesClientProps)
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
