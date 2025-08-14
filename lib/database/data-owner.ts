@@ -53,9 +53,8 @@ export async function getDataOwnerUserId(): Promise<string> {
         return currentUserId;
     }
 
-    // For assistants, we need to check if they have access to the primary owner's data
-    // Since we can't easily get the primary owner's user_id without admin access,
-    // let's implement a simpler approach: check if current user has a shared_access_to field
+    // Check if this user has shared access by looking in the PRIMARY OWNER's profile
+    // First try to get current user's profile to see if shared_access_to is set
     const { data: currentUserProfile } = await supabase
         .from('user_profiles')
         .select('preferences')
@@ -63,10 +62,49 @@ export async function getDataOwnerUserId(): Promise<string> {
         .single();
 
     const preferences = currentUserProfile?.preferences as UserPreferences;
-    const hasSharedAccess = preferences?.shared_access_to; // If this user has access to someone else's data
+    const hasSharedAccess = preferences?.shared_access_to;
 
     if (hasSharedAccess) {
-        return hasSharedAccess as string; // Return the user ID they have access to
+        return hasSharedAccess as string;
+    }
+
+    // If user profile doesn't exist or no shared_access_to, check if they're granted access
+    // by looking for profiles that have this user's email in their shared_access array
+    const { data: profilesWithSharedAccess } = await supabase
+        .from('user_profiles')
+        .select('user_id, preferences')
+        .not('preferences', 'is', null);
+
+    if (profilesWithSharedAccess) {
+        for (const profile of profilesWithSharedAccess) {
+            const prefs = profile.preferences as UserPreferences;
+            const sharedAccess = prefs?.shared_access || [];
+            
+            // Check if this email has been granted access
+            const hasAccess = sharedAccess.some(access => 
+                access.email === user.email && (access.user_id === currentUserId || !access.user_id)
+            );
+            
+            if (hasAccess) {
+                console.log(`Found shared access: ${user.email} can access ${profile.user_id}`);
+                
+                // Set up the shared_access_to in the current user's profile for next time
+                try {
+                    await supabase
+                        .from('user_profiles')
+                        .upsert({
+                            user_id: currentUserId,
+                            preferences: {
+                                shared_access_to: profile.user_id
+                            }
+                        });
+                } catch (error) {
+                    console.log('Could not update user profile, table may not exist yet');
+                }
+                
+                return profile.user_id; // Return the owner's user ID
+            }
+        }
     }
 
     // Default: return current user's ID (they see their own data)
