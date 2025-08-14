@@ -77,32 +77,41 @@ export async function getDataOwnerUserId(): Promise<string> {
 
     if (profilesWithSharedAccess) {
         for (const profile of profilesWithSharedAccess) {
-            const prefs = profile.preferences as UserPreferences;
-            const sharedAccess = prefs?.shared_access || [];
-            
-            // Check if this email has been granted access
-            const hasAccess = sharedAccess.some(access => 
-                access.email === user.email && (access.user_id === currentUserId || !access.user_id)
-            );
-            
-            if (hasAccess) {
-                console.log(`Found shared access: ${user.email} can access ${profile.user_id}`);
+            try {
+                // Parse the JSON preferences
+                const prefsString = typeof profile.preferences === 'string' 
+                    ? profile.preferences 
+                    : JSON.stringify(profile.preferences);
+                const prefs = JSON.parse(prefsString);
+                const sharedAccess = prefs?.shared_access || [];
                 
-                // Set up the shared_access_to in the current user's profile for next time
-                try {
-                    await supabase
-                        .from('user_profiles')
-                        .upsert({
-                            user_id: currentUserId,
-                            preferences: {
-                                shared_access_to: profile.user_id
-                            }
-                        });
-                } catch (error) {
-                    console.log('Could not update user profile, table may not exist yet');
+                // Check if this email has been granted access
+                const hasAccess = sharedAccess.some((access: any) => 
+                    access.email === user.email
+                );
+                
+                if (hasAccess) {
+                    console.log(`Found shared access: ${user.email} can access ${profile.user_id}`);
+                    
+                    // Set up the shared_access_to in the current user's profile for next time
+                    try {
+                        await supabase
+                            .from('user_profiles')
+                            .upsert({
+                                user_id: currentUserId,
+                                preferences: JSON.stringify({
+                                    shared_access_to: profile.user_id
+                                })
+                            });
+                    } catch (error) {
+                        console.log('Could not update user profile:', error);
+                    }
+                    
+                    return profile.user_id; // Return the owner's user ID
                 }
-                
-                return profile.user_id; // Return the owner's user ID
+            } catch (parseError) {
+                console.log('Could not parse preferences for profile:', profile.user_id);
+                continue;
             }
         }
     }
