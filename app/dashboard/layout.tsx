@@ -322,7 +322,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
 
                 {/* Page content */}
-                <main className='p-6'>{children}</main>
+                <main className='flex h-[calc(100vh-4rem)] flex-col p-6'>{children}</main>
             </div>
 
             {/* Chat Sidebar */}

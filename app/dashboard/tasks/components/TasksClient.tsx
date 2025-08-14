@@ -154,15 +154,44 @@ export default function TasksClient({ initialTasks, initialChatMessages }: Tasks
     };
 
     return (
-        <div className='space-y-6'>
-            <div>
-                <h1 className='text-3xl font-bold'>Assistant Tasks & Communication</h1>
-                <p className='mt-2 text-muted-foreground'>Manage tasks and communicate with your assistant in one place.</p>
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                <div>
+                    <h1 className='text-3xl font-bold'>Assistant Tasks & Communication</h1>
+                    <p className='mt-2 text-muted-foreground'>Manage tasks and communicate with your assistant in one place.</p>
+                </div>
+                
+                {/* Task Stats - Always visible */}
+                <div className='mt-6 grid grid-cols-5 gap-4'>
+                    <div className='rounded-lg border bg-card p-3 text-center'>
+                        <div className='text-lg font-semibold text-red-600'>{taskStats.backlog}</div>
+                        <div className='text-xs text-muted-foreground'>Backlog</div>
+                    </div>
+                    <div className='rounded-lg border bg-card p-3 text-center'>
+                        <div className='text-lg font-semibold text-blue-600'>{taskStats.todo}</div>
+                        <div className='text-xs text-muted-foreground'>To Do</div>
+                    </div>
+                    <div className='rounded-lg border bg-card p-3 text-center'>
+                        <div className='text-lg font-semibold text-yellow-600'>{taskStats.inProgress}</div>
+                        <div className='text-xs text-muted-foreground'>In Progress</div>
+                    </div>
+                    <div className='rounded-lg border bg-card p-3 text-center'>
+                        <div className='text-lg font-semibold text-purple-600'>{taskStats.inReview}</div>
+                        <div className='text-xs text-muted-foreground'>In Review</div>
+                    </div>
+                    <div className='rounded-lg border bg-card p-3 text-center'>
+                        <div className='text-lg font-semibold text-green-600'>{taskStats.done}</div>
+                        <div className='text-xs text-muted-foreground'>Done</div>
+                    </div>
+                </div>
             </div>
-
-            <div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-hidden pt-6'>
+                <div className='grid h-full grid-cols-1 gap-6 lg:grid-cols-2'>
                 {/* Task Management */}
-                <div className='space-y-4'>
+                <div className='flex h-full flex-col space-y-4'>
                     <div className='flex items-center justify-between'>
                         <h2 className='flex items-center gap-2 text-xl font-semibold'>
                             <CheckSquare className='h-5 w-5' />
@@ -203,7 +232,7 @@ export default function TasksClient({ initialTasks, initialChatMessages }: Tasks
                         </div>
                     )}
 
-                    <div className='max-h-96 space-y-3 overflow-y-auto'>
+                    <div className='flex-1 space-y-3 overflow-y-auto'>
                         {tasks.map((task) => (
                             <div key={task.id} className='rounded-lg border bg-card p-4'>
                                 <div className='flex items-start justify-between'>
@@ -241,15 +270,15 @@ export default function TasksClient({ initialTasks, initialChatMessages }: Tasks
                 </div>
 
                 {/* Chat Interface */}
-                <div className='space-y-4'>
+                <div className='flex h-full flex-col space-y-4'>
                     <h2 className='flex items-center gap-2 text-xl font-semibold'>
                         <MessageSquare className='h-5 w-5' />
                         Chat with Assistant
                     </h2>
 
-                    <div className='rounded-lg border bg-card'>
+                    <div className='flex flex-1 flex-col rounded-lg border bg-card'>
                         {/* Messages */}
-                        <div className='h-80 space-y-3 overflow-y-auto p-4'>
+                        <div className='flex-1 space-y-3 overflow-y-auto p-4'>
                             {chatMessages.map((msg) => (
                                 <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
                                     <div
@@ -286,37 +315,6 @@ export default function TasksClient({ initialTasks, initialChatMessages }: Tasks
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-4'>
-                <div className='rounded-lg border bg-card p-4'>
-                    <div className='flex items-center gap-2'>
-                        <AlertCircle className='h-4 w-4 text-orange-600 dark:text-orange-400' />
-                        <span className='text-sm text-muted-foreground'>Todo Tasks</span>
-                    </div>
-                    <p className='text-xl font-bold'>{taskStats.todo}</p>
-                </div>
-                <div className='rounded-lg border bg-card p-4'>
-                    <div className='flex items-center gap-2'>
-                        <Clock className='h-4 w-4 text-blue-600 dark:text-blue-400' />
-                        <span className='text-sm text-muted-foreground'>In Progress</span>
-                    </div>
-                    <p className='text-xl font-bold'>{taskStats.inProgress}</p>
-                </div>
-                <div className='rounded-lg border bg-card p-4'>
-                    <div className='flex items-center gap-2'>
-                        <Check className='h-4 w-4 text-green-600 dark:text-green-400' />
-                        <span className='text-sm text-muted-foreground'>Completed</span>
-                    </div>
-                    <p className='text-xl font-bold'>{taskStats.done}</p>
-                </div>
-                <div className='rounded-lg border bg-card p-4'>
-                    <div className='flex items-center gap-2'>
-                        <MessageSquare className='h-4 w-4 text-purple-600 dark:text-purple-400' />
-                        <span className='text-sm text-muted-foreground'>Messages Today</span>
-                    </div>
-                    <p className='text-xl font-bold'>{chatMessages.length}</p>
                 </div>
             </div>
         </div>

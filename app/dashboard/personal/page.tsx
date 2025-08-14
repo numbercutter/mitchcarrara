@@ -33,14 +33,16 @@ export default async function PersonalPage() {
     const recentActivities = getRecentActivities(data.recentActivities, 4);
 
     return (
-        <div className='space-y-8'>
-            <div>
-                <h1 className='text-3xl font-bold'>Personal Life</h1>
-                <p className='mt-2 text-muted-foreground'>Track your personal goals, habits, and well-being.</p>
-            </div>
+        <div className='flex h-full flex-col'>
+            {/* Sticky Header */}
+            <div className='sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm pb-6'>
+                <div>
+                    <h1 className='text-3xl font-bold'>Personal Life</h1>
+                    <p className='mt-2 text-muted-foreground'>Track your personal goals, habits, and well-being.</p>
+                </div>
 
-            {/* Quick Stats */}
-            <div className='grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'>
+                {/* Quick Stats - Always visible */}
+                <div className='mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4'>
                 <div className='rounded-lg border bg-card p-6'>
                     <div className='flex items-center gap-3'>
                         <div className='rounded-full bg-green-100 p-2 dark:bg-green-900/20'>
@@ -88,8 +90,11 @@ export default async function PersonalPage() {
                         </div>
                     </div>
                 </div>
+                </div>
             </div>
-
+            
+            {/* Scrollable Content */}
+            <div className='flex-1 overflow-y-auto pt-6'>
             {/* Main Content Grid */}
             <div className='grid grid-cols-1 gap-6 lg:grid-cols-3'>
                 {/* Health & Fitness */}
@@ -248,6 +253,7 @@ export default async function PersonalPage() {
                         </div>
                     )}
                 </div>
+            </div>
             </div>
         </div>
     );
