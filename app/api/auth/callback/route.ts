@@ -1,5 +1,62 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import type { UserPreferences } from '@/database';
+
+const PRIMARY_DATA_OWNER_EMAIL = 'numbercutter@protonmail.com';
+
+async function handleSharedAccessOnLogin(userId: string, email: string) {
+    try {
+        const supabase = await createClient();
+        
+        // Check if this user has been granted shared access by the primary owner
+        // Get primary owner's profile
+        const { data: primaryOwnerProfile } = await supabase
+            .from('user_profiles')
+            .select('user_id, preferences')
+            .contains('preferences', { shared_access: [{ email }] });
+
+        if (primaryOwnerProfile && primaryOwnerProfile.length > 0) {
+            // Find the primary owner (the one whose email matches PRIMARY_DATA_OWNER_EMAIL)
+            for (const profile of primaryOwnerProfile) {
+                const preferences = profile.preferences as UserPreferences;
+                const sharedAccess = preferences?.shared_access || [];
+                
+                // Check if this email has been granted access
+                const accessGrant = sharedAccess.find(access => access.email === email);
+                if (accessGrant && !accessGrant.user_id) {
+                    // Update the shared access with the actual user_id
+                    const updatedSharedAccess = sharedAccess.map(access => 
+                        access.email === email ? { ...access, user_id: userId } : access
+                    );
+                    
+                    await supabase
+                        .from('user_profiles')
+                        .update({
+                            preferences: {
+                                ...preferences,
+                                shared_access: updatedSharedAccess
+                            }
+                        })
+                        .eq('user_id', profile.user_id);
+
+                    // Set this user's shared_access_to field
+                    await supabase
+                        .from('user_profiles')
+                        .upsert({
+                            user_id: userId,
+                            preferences: {
+                                shared_access_to: profile.user_id
+                            }
+                        });
+
+                    console.log(`Shared access set up for ${email} to access ${profile.user_id}`);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error handling shared access on login:', error);
+    }
+}
 
 export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url);
@@ -21,6 +78,9 @@ export async function GET(request: Request) {
             console.log('Auth exchange result:', { data: data?.user?.email, error });
 
             if (!error && data.user) {
+                // Check if this user has been granted shared access
+                await handleSharedAccessOnLogin(data.user.id, data.user.email || '');
+
                 const forwardedHost = request.headers.get('x-forwarded-host');
                 const isLocalEnv = process.env.NODE_ENV === 'development';
 
@@ -53,6 +113,9 @@ export async function GET(request: Request) {
             console.log('PKCE Magic link verification result:', { data: data?.user?.email, error });
 
             if (!error && data.user) {
+                // Check if this user has been granted shared access
+                await handleSharedAccessOnLogin(data.user.id, data.user.email || '');
+
                 console.log('PKCE Magic link auth successful, redirecting to:', next);
                 const isLocalEnv = process.env.NODE_ENV === 'development';
 

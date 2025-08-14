@@ -208,14 +208,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {/* Account and Logout for mobile */}
                     <div className='space-y-2 border-t border-border/50 p-4'>
                         <Link
-                            href='/dashboard/account'
+                            href='/dashboard/settings'
                             className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                pathname === '/dashboard/account'
+                                pathname.startsWith('/dashboard/settings')
                                     ? 'border border-primary/20 bg-primary/10 text-primary'
                                     : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
                             }`}>
                             <Settings className='mr-3 h-5 w-5' />
-                            Account
+                            Settings
                         </Link>
                         <LogoutButton />
                     </div>
@@ -277,17 +277,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             );
                         })}
                     </div>
-                    {/* Account and Logout for desktop */}
+                    {/* Settings and Logout for desktop */}
                     <div className='space-y-2 border-t border-border/50 p-4'>
                         <Link
-                            href='/dashboard/account'
+                            href='/dashboard/settings'
                             className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                pathname === '/dashboard/account'
+                                pathname.startsWith('/dashboard/settings')
                                     ? 'border border-primary/20 bg-primary/10 text-primary'
                                     : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
                             }`}>
                             <Settings className='mr-3 h-5 w-5' />
-                            Account
+                            Settings
                         </Link>
                         <LogoutButton />
                     </div>
