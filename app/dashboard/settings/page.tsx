@@ -25,7 +25,7 @@ export default function SettingsPage() {
                             <CardDescription>
                                 Manage who can access your dashboard data. Grant or revoke access to assistants and team members.
                             </CardDescription>
-                        </CardContent>
+                        </CardHeader>
                     </Card>
                 </Link>
 
