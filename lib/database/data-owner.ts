@@ -1,123 +1,27 @@
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentUserId } from './server-helpers';
-import type { UserPreferences } from '@/database';
+import { isEmailApproved } from '@/lib/approved-emails';
+
+const NUMBERCUTTER_EMAIL = 'numbercutter@protonmail.com';
+const NUMBERCUTTER_USER_ID = '51812c6a-d469-4b9b-8f80-63c5539e79eb'; // From your user_profiles data
 
 /**
- * Configuration for data ownership
- * In your case, you are the primary data owner
- */
-const PRIMARY_DATA_OWNER_EMAIL = 'numbercutter@protonmail.com'; // Your email
-
-/**
- * Get the primary owner's user ID from user_profiles table
- */
-async function getPrimaryOwnerUserId(): Promise<string | null> {
-    const supabase = await createClient();
-    
-    // Find the primary owner by looking for their profile with a special flag or by their known user_id
-    // For now, we'll need to store the primary owner's user_id somewhere accessible
-    // Let's check if there's a profile with the primary owner's email in the metadata
-    const { data: profiles } = await supabase
-        .from('user_profiles')
-        .select('user_id, preferences')
-        .not('preferences', 'is', null);
-
-    // For now, return null and handle this case - we need the primary owner's user_id
-    return null;
-}
-
-/**
- * Get the data owner's user ID - either the current user if they're the owner,
- * or the primary owner if the current user is an assistant with access
+ * SIMPLIFIED: Everyone sees numbercutter's data if they're approved
  */
 export async function getDataOwnerUserId(): Promise<string> {
-    const currentUserId = await getCurrentUserId();
-
-    if (!currentUserId) {
-        throw new Error('User not authenticated');
-    }
-
     const supabase = await createClient();
-
-    // Get current user's email
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user?.email) {
         throw new Error('User email not found');
     }
 
-    // If current user is the primary owner, return their ID
-    if (user.email === PRIMARY_DATA_OWNER_EMAIL) {
-        return currentUserId;
+    // Check if email is approved to access the app
+    if (!isEmailApproved(user.email)) {
+        throw new Error('Email not approved');
     }
 
-    // Check if this user has shared access by looking in the PRIMARY OWNER's profile
-    // First try to get current user's profile to see if shared_access_to is set
-    const { data: currentUserProfile } = await supabase
-        .from('user_profiles')
-        .select('preferences')
-        .eq('user_id', currentUserId)
-        .single();
-
-    const preferences = currentUserProfile?.preferences as UserPreferences;
-    const hasSharedAccess = preferences?.shared_access_to;
-
-    if (hasSharedAccess) {
-        return hasSharedAccess as string;
-    }
-
-    // If user profile doesn't exist or no shared_access_to, check if they're granted access
-    // by looking for profiles that have this user's email in their shared_access array
-    const { data: profilesWithSharedAccess } = await supabase
-        .from('user_profiles')
-        .select('user_id, preferences')
-        .not('preferences', 'is', null);
-
-    if (profilesWithSharedAccess) {
-        for (const profile of profilesWithSharedAccess) {
-            try {
-                // Parse the JSON preferences
-                const prefsString = typeof profile.preferences === 'string' 
-                    ? profile.preferences 
-                    : JSON.stringify(profile.preferences);
-                const prefs = JSON.parse(prefsString);
-                const sharedAccess = prefs?.shared_access || [];
-                
-                // Check if this email has been granted access
-                const hasAccess = sharedAccess.some((access: any) => 
-                    access.email === user.email
-                );
-                
-                if (hasAccess) {
-                    console.log(`Found shared access: ${user.email} can access ${profile.user_id}`);
-                    
-                    // Set up the shared_access_to in the current user's profile for next time
-                    try {
-                        await supabase
-                            .from('user_profiles')
-                            .upsert({
-                                user_id: currentUserId,
-                                preferences: JSON.stringify({
-                                    shared_access_to: profile.user_id
-                                })
-                            });
-                    } catch (error) {
-                        console.log('Could not update user profile:', error);
-                    }
-                    
-                    return profile.user_id; // Return the owner's user ID
-                }
-            } catch (parseError) {
-                console.log('Could not parse preferences for profile:', profile.user_id);
-                continue;
-            }
-        }
-    }
-
-    // Default: return current user's ID (they see their own data)
-    return currentUserId;
+    // EVERYONE sees numbercutter's data - no exceptions
+    return NUMBERCUTTER_USER_ID;
 }
 
 /**
@@ -125,15 +29,12 @@ export async function getDataOwnerUserId(): Promise<string> {
  */
 export async function isCurrentUserPrimaryOwner(): Promise<boolean> {
     const supabase = await createClient();
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    return user?.email === PRIMARY_DATA_OWNER_EMAIL;
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.email === NUMBERCUTTER_EMAIL;
 }
 
 /**
- * Get display context for the current user
+ * SIMPLIFIED: Display context - everyone sees numbercutter's data
  */
 export async function getDisplayContext(): Promise<{
     isOwner: boolean;
@@ -141,50 +42,19 @@ export async function getDisplayContext(): Promise<{
     dataOwnerEmail: string;
     currentUserEmail: string;
 }> {
-    try {
-        const currentUserId = await getCurrentUserId();
-        if (!currentUserId) {
-            throw new Error('Not authenticated');
-        }
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-        const dataOwnerUserId = await getDataOwnerUserId();
-        const isOwner = await isCurrentUserPrimaryOwner();
-
-        const supabase = await createClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
-
-        const viewingOwnData = currentUserId === dataOwnerUserId;
-        let dataOwnerEmail = PRIMARY_DATA_OWNER_EMAIL;
-
-        // If viewing someone else's data, we might want to show their email
-        // For now, we'll always show the primary owner's email as the "data source"
-        if (!viewingOwnData) {
-            dataOwnerEmail = PRIMARY_DATA_OWNER_EMAIL;
-        } else if (isOwner) {
-            dataOwnerEmail = user?.email || PRIMARY_DATA_OWNER_EMAIL;
-        }
-
-        return {
-            isOwner,
-            viewingOwnData,
-            dataOwnerEmail,
-            currentUserEmail: user?.email || '',
-        };
-    } catch (error) {
-        console.error('Error in getDisplayContext:', error);
-        // Return safe defaults
-        const supabase = await createClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
-
-        return {
-            isOwner: user?.email === PRIMARY_DATA_OWNER_EMAIL,
-            viewingOwnData: true,
-            dataOwnerEmail: user?.email || '',
-            currentUserEmail: user?.email || '',
-        };
+    if (!user?.email) {
+        throw new Error('Not authenticated');
     }
+
+    const isOwner = user.email === NUMBERCUTTER_EMAIL;
+    
+    return {
+        isOwner,
+        viewingOwnData: isOwner, // Only numbercutter is viewing "own" data
+        dataOwnerEmail: NUMBERCUTTER_EMAIL,
+        currentUserEmail: user.email,
+    };
 }
