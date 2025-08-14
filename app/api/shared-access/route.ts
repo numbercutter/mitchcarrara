@@ -28,8 +28,19 @@ export async function GET() {
             .eq('user_id', currentUserId)
             .single();
 
-        const preferences = profile?.preferences as UserPreferences;
-        const sharedAccess = preferences?.shared_access || [];
+        let sharedAccess = [];
+        if (profile?.preferences) {
+            try {
+                // Parse JSON string preferences
+                const prefsString = typeof profile.preferences === 'string' 
+                    ? profile.preferences 
+                    : JSON.stringify(profile.preferences);
+                const preferences = JSON.parse(prefsString);
+                sharedAccess = preferences?.shared_access || [];
+            } catch (parseError) {
+                console.error('Error parsing preferences:', parseError);
+            }
+        }
 
         return NextResponse.json({ shared_access: sharedAccess });
     } catch (error) {
@@ -80,8 +91,21 @@ export async function POST(request: Request) {
             throw profileError;
         }
 
-        const preferences = (currentProfile?.preferences as UserPreferences) || {};
-        const sharedAccess = preferences.shared_access || [];
+        // Parse existing preferences
+        let preferences = {};
+        let sharedAccess = [];
+        
+        if (currentProfile?.preferences) {
+            try {
+                const prefsString = typeof currentProfile.preferences === 'string' 
+                    ? currentProfile.preferences 
+                    : JSON.stringify(currentProfile.preferences);
+                preferences = JSON.parse(prefsString);
+                sharedAccess = preferences.shared_access || [];
+            } catch (parseError) {
+                console.error('Error parsing existing preferences:', parseError);
+            }
+        }
 
         // Check if access already granted
         const existingAccess = sharedAccess.find(access => access.email === email);
@@ -97,17 +121,17 @@ export async function POST(request: Request) {
             permissions: ['view']
         });
 
-        const updatedPreferences: UserPreferences = {
+        const updatedPreferences = {
             ...preferences,
             shared_access: sharedAccess
         };
 
-        // Update profile
+        // Update profile with JSON string
         const { error: updateError } = await supabase
             .from('user_profiles')
             .upsert({
                 user_id: currentUserId,
-                preferences: updatedPreferences
+                preferences: JSON.stringify(updatedPreferences)
             });
 
         if (updateError) {
@@ -155,23 +179,36 @@ export async function DELETE(request: Request) {
             .eq('user_id', currentUserId)
             .single();
 
-        const preferences = (currentProfile?.preferences as UserPreferences) || {};
-        const sharedAccess = preferences.shared_access || [];
+        // Parse existing preferences
+        let preferences = {};
+        let sharedAccess = [];
+        
+        if (currentProfile?.preferences) {
+            try {
+                const prefsString = typeof currentProfile.preferences === 'string' 
+                    ? currentProfile.preferences 
+                    : JSON.stringify(currentProfile.preferences);
+                preferences = JSON.parse(prefsString);
+                sharedAccess = preferences.shared_access || [];
+            } catch (parseError) {
+                console.error('Error parsing existing preferences:', parseError);
+            }
+        }
 
         // Remove the email from shared access
         const updatedSharedAccess = sharedAccess.filter(access => access.email !== email);
 
-        const updatedPreferences: UserPreferences = {
+        const updatedPreferences = {
             ...preferences,
             shared_access: updatedSharedAccess
         };
 
-        // Update profile
+        // Update profile with JSON string
         const { error: updateError } = await supabase
             .from('user_profiles')
             .upsert({
                 user_id: currentUserId,
-                preferences: updatedPreferences
+                preferences: JSON.stringify(updatedPreferences)
             });
 
         if (updateError) {

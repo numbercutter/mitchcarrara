@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Settings, Shield } from 'lucide-react';
+import { Users, Settings, Shield, User } from 'lucide-react';
 
 export default function SettingsPage() {
     return (
@@ -15,6 +15,20 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
+                <Link href="/dashboard/settings/account">
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <User className="h-5 w-5" />
+                                Account
+                            </CardTitle>
+                            <CardDescription>
+                                View your account information, data access permissions, and manage your session.
+                            </CardDescription>
+                        </CardHeader>
+                    </Card>
+                </Link>
+
                 <Link href="/dashboard/settings/shared-access">
                     <Card className="hover:shadow-md transition-shadow cursor-pointer">
                         <CardHeader>
