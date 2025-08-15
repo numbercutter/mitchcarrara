@@ -89,8 +89,8 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
         const completedTasks = tasks.filter(task => task.status === 'done');
         const completedBillableHours = completedTasks.reduce((sum, task) => sum + parseHours(task.estimate), 0);
         
-        // Assuming $100/hour rate - this could be made configurable
-        const hourlyRate = 100;
+        // Assuming $35/hour rate - this could be made configurable
+        const hourlyRate = 35;
         const totalEstimatedValue = totalEstimatedHours * hourlyRate;
         const totalBillableValue = totalBillableHours * hourlyRate;
         
