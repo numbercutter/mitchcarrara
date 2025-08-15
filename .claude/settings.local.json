@@ -8,7 +8,9 @@
       "Bash(mv:*)",
       "Bash(rm:*)",
       "Bash(bun run build:*)",
-      "Bash(bunx tsc:*)"
+      "Bash(bunx tsc:*)",
+      "Bash(grep:*)",
+      "Bash(iconv:*)"
     ],
     "deny": []
   }

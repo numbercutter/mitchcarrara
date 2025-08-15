@@ -19,5 +19,5 @@ export default async function TasksPage() {
         console.error('Error fetching time stats:', error);
     }
 
-    return <TasksClient initialTasks={tasks || []} initialTimeStats={timeStats} />;
+    return <TasksClient initialTasks={tasks || []} initialBillingStats={null} />;
 }
