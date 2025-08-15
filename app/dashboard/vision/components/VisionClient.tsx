@@ -1,495 +1,480 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { Plus, Edit3, Trash2, Target, ArrowDown, CheckCircle, Circle, Grip } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Type, Square, Circle, Minus, MousePointer, Move, Trash2, Save } from 'lucide-react';
 import { Tables } from '@/types/database';
 
-// Type helpers
 type VisionCard = Tables<'vision_cards'>;
 
 interface VisionClientProps {
     initialCards: VisionCard[];
 }
 
-interface LocalVisionCard extends VisionCard {
-    position: { x: number; y: number };
-    hierarchy_level: 'vision' | 'goal' | 'milestone' | 'action';
-    parent_id?: string;
-    color?: string;
+interface CanvasElement {
+    id: string;
+    type: 'text' | 'rect' | 'circle' | 'line';
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    x2?: number; // for lines
+    y2?: number; // for lines
+    text?: string;
+    fontSize?: number;
+    color: string;
+    strokeWidth: number;
+    fill?: boolean;
 }
 
-const HIERARCHY_CONFIG = {
-    vision: {
-        label: 'Vision',
-        icon: Target,
-        color: 'bg-purple-500',
-        textColor: 'text-white',
-        size: 'w-80 h-48',
-        description: 'Your overarching vision or purpose'
-    },
-    goal: {
-        label: 'Goal', 
-        icon: CheckCircle,
-        color: 'bg-blue-500',
-        textColor: 'text-white',
-        size: 'w-72 h-40',
-        description: 'Major goals that support your vision'
-    },
-    milestone: {
-        label: 'Milestone',
-        icon: Circle,
-        color: 'bg-green-500', 
-        textColor: 'text-white',
-        size: 'w-64 h-32',
-        description: 'Key milestones towards your goals'
-    },
-    action: {
-        label: 'Action',
-        icon: ArrowDown,
-        color: 'bg-orange-500',
-        textColor: 'text-white', 
-        size: 'w-56 h-28',
-        description: 'Specific actions you can take'
-    }
-};
+type Tool = 'select' | 'text' | 'rect' | 'circle' | 'line';
 
 export default function VisionClient({ initialCards }: VisionClientProps) {
-    // Transform database cards to include position data from position_x and position_y
-    const transformedCards: LocalVisionCard[] = initialCards.map((card) => ({
-        ...card,
-        position: {
-            x: card.position_x || Math.random() * 400,
-            y: card.position_y || Math.random() * 300,
-        },
-        hierarchy_level: (card.content?.includes('hierarchy:') ? 
-            card.content.split('hierarchy:')[1]?.split('|')[0] as any : 'goal') || 'goal',
-        parent_id: card.content?.includes('parent:') ? 
-            card.content.split('parent:')[1]?.split('|')[0] : undefined,
-        color: card.content?.includes('color:') ? 
-            card.content.split('color:')[1]?.split('|')[0] : undefined
-    }));
-
-    const [cards, setCards] = useState<LocalVisionCard[]>(transformedCards);
-    const [isEditing, setIsEditing] = useState<string | null>(null);
-    const [editContent, setEditContent] = useState('');
-    const [editTitle, setEditTitle] = useState('');
-    const [draggedCard, setDraggedCard] = useState<string | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [tool, setTool] = useState<Tool>('select');
+    const [elements, setElements] = useState<CanvasElement[]>([]);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [currentElement, setCurrentElement] = useState<CanvasElement | null>(null);
+    const [selectedElement, setSelectedElement] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-    const [showAddMenu, setShowAddMenu] = useState(false);
-    const boardRef = useRef<HTMLDivElement>(null);
+    const [showTextInput, setShowTextInput] = useState(false);
+    const [textInputPos, setTextInputPos] = useState({ x: 0, y: 0 });
+    const [textValue, setTextValue] = useState('');
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-    const addCard = async (hierarchyLevel: 'vision' | 'goal' | 'milestone' | 'action', parentId?: string) => {
-        const config = HIERARCHY_CONFIG[hierarchyLevel];
-        setShowAddMenu(false);
-        const position_x = Math.random() * (boardRef.current ? boardRef.current.offsetWidth - 300 : 400);
-        const position_y = Math.random() * (boardRef.current ? boardRef.current.offsetHeight - 200 : 300);
-        
-        const contentData = `hierarchy:${hierarchyLevel}|${parentId ? `parent:${parentId}|` : ''}Enter your ${hierarchyLevel} here...`;
-        
-        const newCard: LocalVisionCard = {
-            id: Date.now().toString(),
-            card_type: 'text',
-            title: `New ${config.label}`,
-            content: contentData,
-            position: { x: position_x, y: position_y },
-            position_x,
-            position_y,
-            hierarchy_level: hierarchyLevel,
-            parent_id: parentId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            user_id: 'user-1', // This would come from auth
-        };
-
-        setCards([...cards, newCard]);
-
-        try {
-            const response = await fetch('/api/vision-cards', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    card_type: 'text',
-                    title: newCard.title,
-                    content: contentData,
-                    position_x,
-                    position_y,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create vision card');
+    // Load existing canvas data
+    useEffect(() => {
+        if (initialCards.length > 0) {
+            const canvasCard = initialCards.find(card => card.card_type === 'canvas');
+            if (canvasCard && canvasCard.content) {
+                try {
+                    const savedElements = JSON.parse(canvasCard.content);
+                    setElements(savedElements);
+                } catch (error) {
+                    console.error('Error loading canvas data:', error);
+                }
             }
-
-            const savedCard = await response.json();
-            // Update the temp card with the real data
-            setCards((prev) =>
-                prev.map((card) =>
-                    card.id === newCard.id
-                        ? {
-                              ...savedCard,
-                              position: { x: savedCard.position_x || position_x, y: savedCard.position_y || position_y },
-                          }
-                        : card
-                )
-            );
-        } catch (error) {
-            console.error('Error creating vision card:', error);
-            // Remove the temp card on error
-            setCards((prev) => prev.filter((card) => card.id !== newCard.id));
         }
-    };
+    }, [initialCards]);
 
-    const startEdit = (card: LocalVisionCard) => {
-        setIsEditing(card.id);
-        setEditTitle(card.title);
-        // Extract the actual content without metadata
-        const content = card.content || '';
-        const cleanContent = content.includes('|') ? 
-            content.split('|').slice(card.parent_id ? 2 : 1).join('|') : content;
-        setEditContent(cleanContent);
-    };
+    // Redraw canvas whenever elements change
+    useEffect(() => {
+        redrawCanvas();
+    }, [elements, selectedElement]);
 
-    const saveEdit = async () => {
-        if (!isEditing) return;
-
-        const titleToSave = editTitle;
-        const contentToSave = editContent;
-        const cardIdToUpdate = isEditing;
+    const getMousePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
         
-        const card = cards.find(c => c.id === isEditing);
-        if (!card) return;
-        
-        // Reconstruct content with metadata
-        const contentData = `hierarchy:${card.hierarchy_level}|${card.parent_id ? `parent:${card.parent_id}|` : ''}${contentToSave}`;
-
-        // Optimistically update the UI
-        const oldCards = cards;
-        setCards(cards.map((card) => (card.id === isEditing ? { ...card, title: titleToSave, content: contentData, updated_at: new Date().toISOString() } : card)));
-        setIsEditing(null);
-        setEditTitle('');
-        setEditContent('');
-
-        try {
-            const response = await fetch(`/api/vision-cards/${cardIdToUpdate}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    title: titleToSave,
-                    content: contentData,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update vision card');
-            }
-
-            // Success - the optimistic update is already correct
-        } catch (error) {
-            console.error('Error updating vision card:', error);
-            // Revert the optimistic update
-            setCards(oldCards);
-            setIsEditing(cardIdToUpdate);
-            setEditTitle(titleToSave);
-            setEditContent(contentToSave);
-        }
-    };
-
-    const deleteCard = async (id: string) => {
-        // Optimistically update the UI
-        const oldCards = cards;
-        setCards(cards.filter((card) => card.id !== id));
-
-        try {
-            const response = await fetch(`/api/vision-cards/${id}`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete vision card');
-            }
-
-            // Success - the optimistic update is already correct
-        } catch (error) {
-            console.error('Error deleting vision card:', error);
-            // Revert the optimistic update
-            setCards(oldCards);
-        }
-    };
-
-    const cancelEdit = () => {
-        setIsEditing(null);
-        setEditTitle('');
-        setEditContent('');
-    };
-
-    // Drag and drop handlers
-    const handleMouseDown = useCallback((e: React.MouseEvent, cardId: string) => {
-        if (isEditing) return;
-        
-        const card = cards.find(c => c.id === cardId);
-        if (!card) return;
-        
-        const rect = e.currentTarget.getBoundingClientRect();
-        setDragOffset({
+        const rect = canvas.getBoundingClientRect();
+        return {
             x: e.clientX - rect.left,
             y: e.clientY - rect.top
+        };
+    }, []);
+
+    const redrawCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw grid
+        ctx.strokeStyle = '#f0f0f0';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= canvas.width; x += 20) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= canvas.height; y += 20) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
+
+        // Draw elements
+        elements.forEach(element => {
+            ctx.strokeStyle = element.color;
+            ctx.fillStyle = element.color;
+            ctx.lineWidth = element.strokeWidth;
+
+            switch (element.type) {
+                case 'rect':
+                    if (element.fill) {
+                        ctx.fillRect(element.x, element.y, element.width || 0, element.height || 0);
+                    } else {
+                        ctx.strokeRect(element.x, element.y, element.width || 0, element.height || 0);
+                    }
+                    break;
+                
+                case 'circle':
+                    const radius = Math.sqrt((element.width || 0) ** 2 + (element.height || 0) ** 2) / 2;
+                    ctx.beginPath();
+                    ctx.arc(element.x + (element.width || 0) / 2, element.y + (element.height || 0) / 2, radius, 0, 2 * Math.PI);
+                    if (element.fill) {
+                        ctx.fill();
+                    } else {
+                        ctx.stroke();
+                    }
+                    break;
+                
+                case 'line':
+                    ctx.beginPath();
+                    ctx.moveTo(element.x, element.y);
+                    ctx.lineTo(element.x2 || element.x, element.y2 || element.y);
+                    ctx.stroke();
+                    break;
+                
+                case 'text':
+                    ctx.font = `${element.fontSize || 16}px Arial`;
+                    ctx.fillText(element.text || '', element.x, element.y);
+                    break;
+            }
+
+            // Draw selection outline
+            if (selectedElement === element.id) {
+                ctx.strokeStyle = '#007bff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                
+                const padding = 5;
+                if (element.type === 'text') {
+                    const metrics = ctx.measureText(element.text || '');
+                    ctx.strokeRect(element.x - padding, element.y - (element.fontSize || 16) - padding, 
+                                 metrics.width + padding * 2, (element.fontSize || 16) + padding * 2);
+                } else if (element.type === 'line') {
+                    ctx.strokeRect(Math.min(element.x, element.x2 || element.x) - padding, 
+                                 Math.min(element.y, element.y2 || element.y) - padding,
+                                 Math.abs((element.x2 || element.x) - element.x) + padding * 2,
+                                 Math.abs((element.y2 || element.y) - element.y) + padding * 2);
+                } else {
+                    ctx.strokeRect(element.x - padding, element.y - padding, 
+                                 (element.width || 0) + padding * 2, (element.height || 0) + padding * 2);
+                }
+                ctx.setLineDash([]);
+            }
         });
-        setDraggedCard(cardId);
-        
-        e.preventDefault();
-    }, [cards, isEditing]);
+    }, [elements, selectedElement]);
 
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        if (!draggedCard || !boardRef.current) return;
+    const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const pos = getMousePos(e);
         
-        const boardRect = boardRef.current.getBoundingClientRect();
-        const newX = e.clientX - boardRect.left - dragOffset.x;
-        const newY = e.clientY - boardRect.top - dragOffset.y;
-        
-        setCards(prev => prev.map(card => 
-            card.id === draggedCard 
-                ? { ...card, position: { x: Math.max(0, newX), y: Math.max(0, newY) } }
-                : card
-        ));
-    }, [draggedCard, dragOffset]);
-
-    const handleMouseUp = useCallback(async () => {
-        if (!draggedCard) return;
-        
-        const card = cards.find(c => c.id === draggedCard);
-        if (!card) return;
-        
-        // Save position to database
-        try {
-            await fetch(`/api/vision-cards/${draggedCard}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    position_x: card.position.x,
-                    position_y: card.position.y
-                })
+        if (tool === 'select') {
+            // Check if clicking on an element
+            const clickedElement = elements.find(el => {
+                if (el.type === 'text') {
+                    const canvas = canvasRef.current;
+                    if (!canvas) return false;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return false;
+                    ctx.font = `${el.fontSize || 16}px Arial`;
+                    const metrics = ctx.measureText(el.text || '');
+                    return pos.x >= el.x && pos.x <= el.x + metrics.width &&
+                           pos.y >= el.y - (el.fontSize || 16) && pos.y <= el.y;
+                } else if (el.type === 'line') {
+                    // Simple line hit detection
+                    const distance = Math.abs((el.y2! - el.y) * pos.x - (el.x2! - el.x) * pos.y + el.x2! * el.y - el.y2! * el.x) / 
+                                   Math.sqrt((el.y2! - el.y) ** 2 + (el.x2! - el.x) ** 2);
+                    return distance < 5;
+                } else {
+                    return pos.x >= el.x && pos.x <= el.x + (el.width || 0) &&
+                           pos.y >= el.y && pos.y <= el.y + (el.height || 0);
+                }
             });
-        } catch (error) {
-            console.error('Error saving position:', error);
-        }
-        
-        setDraggedCard(null);
-    }, [draggedCard, cards]);
 
-    // Add event listeners for drag
-    React.useEffect(() => {
-        if (draggedCard) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-            return () => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+            if (clickedElement) {
+                setSelectedElement(clickedElement.id);
+                setIsDragging(true);
+                setDragOffset({
+                    x: pos.x - clickedElement.x,
+                    y: pos.y - clickedElement.y
+                });
+            } else {
+                setSelectedElement(null);
+            }
+        } else if (tool === 'text') {
+            setTextInputPos(pos);
+            setShowTextInput(true);
+            setTextValue('');
+        } else {
+            // Start drawing
+            setIsDrawing(true);
+            const newElement: CanvasElement = {
+                id: Date.now().toString(),
+                type: tool,
+                x: pos.x,
+                y: pos.y,
+                width: 0,
+                height: 0,
+                x2: pos.x,
+                y2: pos.y,
+                color: '#000000',
+                strokeWidth: 2,
+                fill: false
             };
+            setCurrentElement(newElement);
         }
-    }, [draggedCard, handleMouseMove, handleMouseUp]);
+    }, [tool, elements, getMousePos]);
 
-    const getCleanContent = (card: LocalVisionCard) => {
-        const content = card.content || '';
-        return content.includes('|') ? 
-            content.split('|').slice(card.parent_id ? 2 : 1).join('|') : content;
-    };
+    const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        const pos = getMousePos(e);
+        
+        if (isDragging && selectedElement) {
+            setElements(prev => prev.map(el => 
+                el.id === selectedElement 
+                    ? { ...el, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }
+                    : el
+            ));
+        } else if (isDrawing && currentElement) {
+            const updatedElement = { ...currentElement };
+            
+            if (tool === 'line') {
+                updatedElement.x2 = pos.x;
+                updatedElement.y2 = pos.y;
+            } else {
+                updatedElement.width = pos.x - currentElement.x;
+                updatedElement.height = pos.y - currentElement.y;
+            }
+            
+            setCurrentElement(updatedElement);
+            // Temporarily add to elements for preview
+            setElements(prev => {
+                const filtered = prev.filter(el => el.id !== currentElement.id);
+                return [...filtered, updatedElement];
+            });
+        }
+    }, [isDragging, selectedElement, dragOffset, isDrawing, currentElement, tool, getMousePos]);
+
+    const handleMouseUp = useCallback(() => {
+        if (isDrawing && currentElement) {
+            setElements(prev => {
+                const filtered = prev.filter(el => el.id !== currentElement.id);
+                return [...filtered, currentElement];
+            });
+            setIsDrawing(false);
+            setCurrentElement(null);
+        }
+        setIsDragging(false);
+    }, [isDrawing, currentElement]);
+
+    const addText = useCallback(() => {
+        if (textValue.trim()) {
+            const newElement: CanvasElement = {
+                id: Date.now().toString(),
+                type: 'text',
+                x: textInputPos.x,
+                y: textInputPos.y,
+                text: textValue,
+                fontSize: 16,
+                color: '#000000',
+                strokeWidth: 1
+            };
+            setElements(prev => [...prev, newElement]);
+        }
+        setShowTextInput(false);
+        setTextValue('');
+    }, [textValue, textInputPos]);
+
+    const deleteSelected = useCallback(() => {
+        if (selectedElement) {
+            setElements(prev => prev.filter(el => el.id !== selectedElement));
+            setSelectedElement(null);
+        }
+    }, [selectedElement]);
+
+    const saveCanvas = useCallback(async () => {
+        try {
+            const canvasData = JSON.stringify(elements);
+            
+            // Check if canvas card already exists
+            const existingCard = initialCards.find(card => card.card_type === 'canvas');
+            
+            if (existingCard) {
+                // Update existing
+                const response = await fetch(`/api/vision-cards/${existingCard.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: canvasData,
+                        updated_at: new Date().toISOString()
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to update canvas');
+            } else {
+                // Create new
+                const response = await fetch('/api/vision-cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        card_type: 'canvas',
+                        title: 'Vision Canvas',
+                        content: canvasData,
+                        position_x: 0,
+                        position_y: 0
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to save canvas');
+            }
+            
+            setLastSaved(new Date());
+        } catch (error) {
+            console.error('Error saving canvas:', error);
+        }
+    }, [elements, initialCards]);
+
+    // Auto-save every 30 seconds if there are changes
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (elements.length > 0) {
+                saveCanvas();
+            }
+        }, 30000);
+        
+        return () => clearInterval(interval);
+    }, [elements, saveCanvas]);
 
     return (
-        <div className='space-y-6'>
-            <div className='flex items-center justify-between'>
-                <div>
-                    <h1 className='text-3xl font-bold'>Vision Board</h1>
-                    <p className='mt-2 text-muted-foreground'>Visualize your goals and dreams. Create a digital vision board to keep you motivated.</p>
-                </div>
-                <div className='flex gap-2'>
-                    <div className='relative'>
-                        <button 
-                            onClick={() => setShowAddMenu(!showAddMenu)}
-                            className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90'
-                        >
-                            <Plus className='h-4 w-4' />
-                            Add Card
-                        </button>
-                        
-                        {showAddMenu && (
-                            <div className='absolute right-0 top-full mt-2 w-64 rounded-lg border bg-card p-2 shadow-lg z-10'>
-                                <div className='space-y-1'>
-                                    {Object.entries(HIERARCHY_CONFIG).map(([level, config]) => {
-                                        const Icon = config.icon;
-                                        return (
-                                            <button
-                                                key={level}
-                                                onClick={() => addCard(level as any)}
-                                                className={`w-full flex items-center gap-3 rounded-md p-3 text-left hover:bg-secondary/50 transition-colors`}
-                                            >
-                                                <div className={`w-8 h-8 rounded ${config.color} flex items-center justify-center`}>
-                                                    <Icon className='h-4 w-4 text-white' />
-                                                </div>
-                                                <div>
-                                                    <div className='font-medium'>{config.label}</div>
-                                                    <div className='text-xs text-muted-foreground'>{config.description}</div>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+        <div className='flex h-full flex-col'>
+            {/* Header */}
+            <div className='border-b bg-background p-4'>
+                <div className='flex items-center justify-between'>
+                    <div>
+                        <h1 className='text-2xl font-bold'>Vision Canvas</h1>
+                        <p className='text-sm text-muted-foreground'>Draw your ideas and goals</p>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                        {lastSaved && (
+                            <span className='text-xs text-muted-foreground'>
+                                Last saved: {lastSaved.toLocaleTimeString()}
+                            </span>
                         )}
+                        <button
+                            onClick={saveCanvas}
+                            className='flex items-center gap-2 rounded bg-primary px-3 py-1 text-sm text-primary-foreground hover:bg-primary/90'
+                        >
+                            <Save className='h-3 w-3' />
+                            Save
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div 
-                ref={boardRef}
-                className='relative min-h-[800px] rounded-lg border-2 border-dashed border-border/30 bg-gradient-to-br from-card/30 to-card/60 p-6 overflow-hidden'
-                style={{ backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px)', backgroundSize: '24px 24px' }}
-            >
-                {cards.map((card) => {
-                    const config = HIERARCHY_CONFIG[card.hierarchy_level] || HIERARCHY_CONFIG.goal;
-                    const Icon = config.icon;
-                    const isDragging = draggedCard === card.id;
+            {/* Toolbar */}
+            <div className='border-b bg-secondary/10 p-2'>
+                <div className='flex items-center gap-2'>
+                    <button
+                        onClick={() => setTool('select')}
+                        className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${
+                            tool === 'select' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
+                        }`}
+                    >
+                        <MousePointer className='h-4 w-4' />
+                        Select
+                    </button>
+                    <button
+                        onClick={() => setTool('text')}
+                        className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${
+                            tool === 'text' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
+                        }`}
+                    >
+                        <Type className='h-4 w-4' />
+                        Text
+                    </button>
+                    <button
+                        onClick={() => setTool('rect')}
+                        className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${
+                            tool === 'rect' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
+                        }`}
+                    >
+                        <Square className='h-4 w-4' />
+                        Rectangle
+                    </button>
+                    <button
+                        onClick={() => setTool('circle')}
+                        className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${
+                            tool === 'circle' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
+                        }`}
+                    >
+                        <Circle className='h-4 w-4' />
+                        Circle
+                    </button>
+                    <button
+                        onClick={() => setTool('line')}
+                        className={`flex items-center gap-1 rounded px-3 py-1 text-sm ${
+                            tool === 'line' ? 'bg-primary text-primary-foreground' : 'hover:bg-secondary'
+                        }`}
+                    >
+                        <Minus className='h-4 w-4' />
+                        Line
+                    </button>
                     
-                    return (
-                        <div
-                            key={card.id}
-                            className={`absolute ${config.size} rounded-lg border-2 ${config.color} shadow-lg transition-all cursor-move select-none ${
-                                isDragging ? 'z-50 scale-105 shadow-2xl' : 'hover:shadow-xl'
-                            } ${isEditing === card.id ? 'z-40' : ''}`}
-                            style={{
-                                left: `${card.position.x}px`,
-                                top: `${card.position.y}px`,
-                                transform: isEditing === card.id ? 'scale(1.02)' : isDragging ? 'scale(1.05)' : 'scale(1)',
-                            }}
-                            onMouseDown={(e) => handleMouseDown(e, card.id)}
+                    <div className='mx-2 h-6 w-px bg-border'></div>
+                    
+                    {selectedElement && (
+                        <button
+                            onClick={deleteSelected}
+                            className='flex items-center gap-1 rounded px-3 py-1 text-sm text-destructive hover:bg-destructive/10'
                         >
-                            {/* Drag Handle */}
-                            <div className='absolute top-2 right-2 opacity-60 hover:opacity-100 transition-opacity pointer-events-none'>
-                                <Grip className='h-4 w-4 text-white' />
-                            </div>
-                            
-                            {/* Hierarchy Badge */}
-                            <div className='absolute top-2 left-2 flex items-center gap-1'>
-                                <Icon className='h-4 w-4 text-white' />
-                                <span className='text-xs font-medium text-white uppercase tracking-wide'>{config.label}</span>
-                            </div>
+                            <Trash2 className='h-4 w-4' />
+                            Delete
+                        </button>
+                    )}
+                </div>
+            </div>
 
-                            {isEditing === card.id ? (
-                                <div className='p-4 space-y-3 h-full'>
-                                    <input
-                                        type='text'
-                                        value={editTitle}
-                                        onChange={(e) => setEditTitle(e.target.value)}
-                                        className='w-full rounded border bg-white/90 px-3 py-2 text-sm font-semibold'
-                                        placeholder='Card title...'
-                                    />
-                                    <textarea
-                                        value={editContent}
-                                        onChange={(e) => setEditContent(e.target.value)}
-                                        className='w-full resize-none rounded border bg-white/90 px-3 py-2 text-sm flex-1'
-                                        rows={config.size.includes('h-48') ? 6 : config.size.includes('h-40') ? 4 : 3}
-                                        placeholder={`Enter your ${config.label.toLowerCase()}...`}
-                                    />
-                                    <div className='flex justify-end gap-2'>
-                                        <button onClick={cancelEdit} className='px-3 py-1 text-xs text-white/80 hover:text-white bg-white/20 rounded'>
-                                            Cancel
-                                        </button>
-                                        <button onClick={saveEdit} className='rounded bg-white/90 px-3 py-1 text-xs text-gray-900 hover:bg-white'>
-                                            Save
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className='p-4 h-full flex flex-col'>
-                                    <div className='mt-6 mb-3'>
-                                        <h3 className={`font-bold ${config.textColor} text-lg leading-tight`}>{card.title}</h3>
-                                    </div>
-                                    
-                                    <div className='flex-1 overflow-hidden'>
-                                        <p className={`text-sm leading-relaxed ${config.textColor} opacity-90`}>
-                                            {getCleanContent(card)}
-                                        </p>
-                                    </div>
-
-                                    <div className='absolute bottom-2 right-2 flex gap-1 opacity-0 hover:opacity-100 transition-opacity'>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); startEdit(card); }}
-                                            className='rounded-full bg-white/20 p-1.5 text-white hover:bg-white/30 transition-colors'
-                                        >
-                                            <Edit3 className='h-3 w-3' />
-                                        </button>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }} 
-                                            className='rounded-full bg-red-500/80 p-1.5 text-white hover:bg-red-500 transition-colors'
-                                        >
-                                            <Trash2 className='h-3 w-3' />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-
-                {cards.length === 0 && (
-                    <div className='flex h-full items-center justify-center'>
-                        <div className='text-center max-w-md'>
-                            <div className='mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10'>
-                                <Target className='h-10 w-10 text-primary' />
-                            </div>
-                            <h3 className='text-xl font-bold mb-3'>Create Your Vision Board</h3>
-                            <p className='text-muted-foreground mb-6'>Build a hierarchical whiteboard of your goals and visions. Start with your big picture vision, then add supporting goals, milestones, and action items.</p>
-                            
-                            <div className='grid grid-cols-2 gap-3 text-left'>
-                                {Object.entries(HIERARCHY_CONFIG).map(([level, config]) => {
-                                    const Icon = config.icon;
-                                    return (
-                                        <div key={level} className='flex items-center gap-2 p-2 rounded border bg-card'>
-                                            <div className={`w-6 h-6 rounded ${config.color} flex items-center justify-center`}>
-                                                <Icon className='h-3 w-3 text-white' />
-                                            </div>
-                                            <div className='text-xs'>
-                                                <div className='font-medium'>{config.label}</div>
-                                                <div className='text-muted-foreground text-[10px]'>{config.description}</div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+            {/* Canvas */}
+            <div className='flex-1 overflow-hidden bg-white p-4'>
+                <canvas
+                    ref={canvasRef}
+                    width={1200}
+                    height={800}
+                    className='border cursor-crosshair shadow-sm'
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
+                />
+                
+                {/* Text Input Modal */}
+                {showTextInput && (
+                    <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'>
+                        <div className='rounded-lg bg-card p-4 shadow-lg'>
+                            <h3 className='mb-3 font-medium'>Add Text</h3>
+                            <input
+                                type='text'
+                                value={textValue}
+                                onChange={(e) => setTextValue(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && addText()}
+                                className='mb-3 w-full rounded border px-3 py-2'
+                                placeholder='Enter text...'
+                                autoFocus
+                            />
+                            <div className='flex gap-2'>
+                                <button
+                                    onClick={() => setShowTextInput(false)}
+                                    className='rounded border px-3 py-1 text-sm hover:bg-secondary'
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={addText}
+                                    className='rounded bg-primary px-3 py-1 text-sm text-primary-foreground hover:bg-primary/90'
+                                >
+                                    Add
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
-                
-                {/* Connection Lines (Future Enhancement) */}
-                <svg className='absolute inset-0 pointer-events-none' style={{ zIndex: 1 }}>
-                    {cards.map(card => {
-                        if (!card.parent_id) return null;
-                        const parent = cards.find(c => c.id === card.parent_id);
-                        if (!parent) return null;
-                        
-                        const startX = parent.position.x + 150; // Center of parent card
-                        const startY = parent.position.y + 80;
-                        const endX = card.position.x + 150; // Center of child card  
-                        const endY = card.position.y + 80;
-                        
-                        return (
-                            <line
-                                key={`${parent.id}-${card.id}`}
-                                x1={startX}
-                                y1={startY}
-                                x2={endX}
-                                y2={endY}
-                                stroke='currentColor'
-                                strokeWidth='2'
-                                strokeDasharray='5,5'
-                                className='text-border opacity-40'
-                            />
-                        );
-                    })}
-                </svg>
             </div>
         </div>
     );
