@@ -297,7 +297,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
             {/* Chat Sidebar */}
             <div
-                className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-transform duration-300 dark:shadow-[0_0_15px_rgba(0,0,0,0.3)] sm:w-96 lg:w-[28rem] xl:w-[32rem] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-transform duration-300 dark:shadow-[0_0_15px_rgba(0,0,0,0.3)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 {/* Header */}
                 <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
                     <div className='flex items-center gap-3'>
@@ -402,7 +402,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                             {messages.map((message) => (
                                 <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div
-                                        className={`max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[80%] ${
+                                        className={`max-w-[80%] rounded-lg px-3 py-2 ${
                                             message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-foreground'
                                         }`}>
                                         <p className='whitespace-pre-wrap break-words text-sm leading-relaxed'>{message.content}</p>
