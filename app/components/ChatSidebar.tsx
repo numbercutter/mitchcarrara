@@ -41,7 +41,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [hasNewMessages, setHasNewMessages] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const lastMessageCountRef = useRef<number>(0);
 
@@ -163,6 +163,11 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                     }
                 }
             });
+
+            // Focus textarea when sidebar opens (after a small delay for animation)
+            setTimeout(() => {
+                inputRef.current?.focus();
+            }, 300);
         }
     }, [isOpen]);
 
@@ -252,11 +257,10 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         return threads.find((t) => t.id === currentThreadId);
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
+    // Auto-resize textarea helper
+    const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     };
 
     const formatTime = (timestamp: string) => {
@@ -293,12 +297,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
             {/* Chat Sidebar */}
             <div
-                className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-transform duration-300 dark:shadow-[0_0_15px_rgba(0,0,0,0.3)] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm transition-transform duration-300 dark:shadow-[0_0_15px_rgba(0,0,0,0.3)] sm:w-96 lg:w-[28rem] xl:w-[32rem] ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 {/* Header */}
                 <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
                     <div className='flex items-center gap-3'>
                         <MessageSquare className='h-5 w-5 text-primary' />
-                        <span className='font-semibold text-foreground'>{showHistory ? 'Chat History' : 'Assistant Chat'}</span>
+                        <span className='truncate font-semibold text-foreground'>{showHistory ? 'Chat History' : 'Assistant Chat'}</span>
                     </div>
                     <div className='flex items-center gap-2'>
                         <button
@@ -358,7 +362,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                                         } ${isToday ? 'ring-2 ring-primary/20' : ''}`}>
                                         <div className='mb-2 flex items-center justify-between'>
                                             <div className='flex items-center gap-2'>
-                                                <h3 className='truncate text-sm font-medium text-foreground'>{thread.title}</h3>
+                                                <h3 className='truncate break-words text-sm font-medium text-foreground'>{thread.title}</h3>
                                                 {isToday && <span className='rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary'>Today</span>}
                                             </div>
                                             <span className='text-xs text-muted-foreground'>{thread.messageCount || 0} msgs</span>
@@ -385,7 +389,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                         {/* Current Thread Info */}
                         {getCurrentThread() && (
                             <div className='border-b border-border/50 bg-secondary/20 p-3'>
-                                <div className='text-sm font-medium text-foreground'>{getCurrentThread()?.title}</div>
+                                <div className='truncate break-words text-sm font-medium text-foreground'>{getCurrentThread()?.title}</div>
                                 <div className='text-xs text-muted-foreground'>
                                     {messages.length} messages
                                     {isLoading && ' • Loading...'}
@@ -398,13 +402,13 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                             {messages.map((message) => (
                                 <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div
-                                        className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                                        className={`max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[80%] ${
                                             message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-foreground'
                                         }`}>
-                                        <p className='text-sm'>{message.content}</p>
+                                        <p className='whitespace-pre-wrap break-words text-sm leading-relaxed'>{message.content}</p>
                                         {message.message_type === 'task' && message.metadata?.taskTitle && (
                                             <div className='mt-2 rounded bg-background/20 p-2'>
-                                                <p className='text-xs font-medium'>Task: {message.metadata.taskTitle}</p>
+                                                <p className='break-words text-xs font-medium'>Task: {message.metadata.taskTitle}</p>
                                             </div>
                                         )}
                                         <p className='mt-1 text-xs opacity-70'>{formatTime(message.created_at)}</p>
@@ -436,23 +440,33 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
                         {/* Input */}
                         <div className='border-t border-border/50 p-4'>
-                            <div className='flex items-center gap-2 rounded-md border border-border/50 bg-background/50 p-2'>
-                                <input
+                            <div className='flex items-end gap-2 rounded-md border border-border/50 bg-background/50 p-2'>
+                                <textarea
                                     ref={inputRef}
-                                    type='text'
                                     value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    onKeyPress={handleKeyPress}
-                                    placeholder='Ask your assistant...'
-                                    className='flex-1 bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none'
+                                    onChange={(e) => {
+                                        setNewMessage(e.target.value);
+                                        adjustTextareaHeight(e.target);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleSendMessage();
+                                        }
+                                    }}
+                                    placeholder='Ask your assistant... (Shift+Enter for new line)'
+                                    className='scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent max-h-[7.5rem] min-h-[2.5rem] flex-1 resize-none overflow-y-auto break-words bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none'
+                                    style={{ height: '2.5rem' }}
+                                    rows={1}
                                 />
                                 <button
                                     onClick={handleSendMessage}
                                     disabled={!newMessage.trim() || isTyping}
-                                    className='rounded-md p-1.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50'>
+                                    className='flex-shrink-0 self-end rounded-md p-1.5 text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50'>
                                     <Send className='h-4 w-4' />
                                 </button>
                             </div>
+                            <p className='mt-2 text-xs text-muted-foreground'>Tip: Use Shift+Enter for new lines</p>
                         </div>
                     </>
                 )}
