@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { isEmailApproved } from '@/lib/approved-emails';
+import { isEmailApprovedAsync } from '@/lib/approved-emails';
 
 const NUMBERCUTTER_EMAIL = 'numbercutter@protonmail.com';
 const NUMBERCUTTER_USER_ID = '51812c6a-d469-4b9b-8f80-63c5539e79eb'; // From your user_profiles data
@@ -9,14 +9,16 @@ const NUMBERCUTTER_USER_ID = '51812c6a-d469-4b9b-8f80-63c5539e79eb'; // From you
  */
 export async function getDataOwnerUserId(): Promise<string> {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user?.email) {
         throw new Error('User email not found');
     }
 
     // Check if email is approved to access the app
-    if (!isEmailApproved(user.email)) {
+    if (!(await isEmailApprovedAsync(user.email))) {
         throw new Error('Email not approved');
     }
 
@@ -29,7 +31,9 @@ export async function getDataOwnerUserId(): Promise<string> {
  */
 export async function isCurrentUserPrimaryOwner(): Promise<boolean> {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
     return user?.email === NUMBERCUTTER_EMAIL;
 }
 
@@ -43,14 +47,16 @@ export async function getDisplayContext(): Promise<{
     currentUserEmail: string;
 }> {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user?.email) {
         throw new Error('Not authenticated');
     }
 
     const isOwner = user.email === NUMBERCUTTER_EMAIL;
-    
+
     return {
         isOwner,
         viewingOwnData: isOwner, // Only numbercutter is viewing "own" data
