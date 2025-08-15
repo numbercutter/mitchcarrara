@@ -1,18 +1,14 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag, Play, Pause, Square } from 'lucide-react';
+import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag } from 'lucide-react';
 import type { Tables } from '@/types/database';
 
 type Task = Tables<'tasks'>;
 
-// Extended task type with time tracking
-interface TaskWithTimeTracking extends Task {
-    total_time_logged?: number; // in minutes
-    active_timer?: {
-        start_time: string;
-        elapsed: number;
-    } | null;
+// Extended task type with billable hours
+interface TaskWithBilling extends Task {
+    billable_hours?: number; // actual hours worked for billing
 }
 
 interface TaskManageClientProps {
@@ -43,20 +39,17 @@ interface SortConfig {
 }
 
 export default function TaskManageClient({ initialTasks }: TaskManageClientProps) {
-    const [tasks, setTasks] = useState<TaskWithTimeTracking[]>(initialTasks.map(task => ({
+    const [tasks, setTasks] = useState<TaskWithBilling[]>(initialTasks.map(task => ({
         ...task,
-        total_time_logged: 0,
-        active_timer: null
+        billable_hours: 0
     })));
     const [selectedStatus, setSelectedStatus] = useState<string>('all');
     const [selectedPriority, setSelectedPriority] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
-    const [editingTask, setEditingTask] = useState<TaskWithTimeTracking | null>(null);
+    const [editingTask, setEditingTask] = useState<TaskWithBilling | null>(null);
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'updated_at', direction: 'desc' });
-    const [activeTimers, setActiveTimers] = useState<Map<string, NodeJS.Timeout>>(new Map());
-    const timerUpdateInterval = useRef<NodeJS.Timeout | null>(null);
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
@@ -64,7 +57,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         priority: 'medium',
         assignee: 'me',
         due_date: '',
-        estimate: '',
+        estimate_hours: '',
+        billable_hours: '',
         labels: [] as string[],
     });
     const [newLabel, setNewLabel] = useState('');
@@ -77,7 +71,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             priority: 'medium',
             assignee: 'me',
             due_date: '',
-            estimate: '',
+            estimate_hours: '',
+            billable_hours: '',
             labels: [],
         });
         setEditingTask(null);
@@ -94,7 +89,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             priority: task.priority || 'medium',
             assignee: task.assignee || 'me',
             due_date: task.due_date ? task.due_date.split('T')[0] : '',
-            estimate: task.estimate || '',
+            estimate_hours: task.estimate_hours?.toString() || '',
+            billable_hours: task.billable_hours?.toString() || '',
             labels: task.labels || [],
         });
         setShowNewTaskForm(true);
@@ -133,7 +129,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         priority: taskForm.priority,
                         assignee: taskForm.assignee,
                         due_date: taskForm.due_date || null,
-                        estimate: taskForm.estimate || null,
+                        estimate_hours: taskForm.estimate_hours ? parseFloat(taskForm.estimate_hours) : null,
+                        billable_hours: taskForm.billable_hours ? parseFloat(taskForm.billable_hours) : null,
                         labels: taskForm.labels,
                     }),
                 });
@@ -154,7 +151,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         priority: taskForm.priority,
                         assignee: taskForm.assignee,
                         due_date: taskForm.due_date || null,
-                        estimate: taskForm.estimate || null,
+                        estimate_hours: taskForm.estimate_hours ? parseFloat(taskForm.estimate_hours) : null,
+                        billable_hours: taskForm.billable_hours ? parseFloat(taskForm.billable_hours) : null,
                         labels: taskForm.labels,
                     }),
                 });
@@ -194,9 +192,6 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
     const deleteTask = async (id: string) => {
         if (!confirm('Are you sure you want to delete this task?')) return;
 
-        // Stop timer if running
-        stopTimer(id);
-
         try {
             const response = await fetch(`/api/tasks/${id}`, {
                 method: 'DELETE',
@@ -210,136 +205,16 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         }
     };
 
-    // Time tracking functions
-    const startTimer = (taskId: string) => {
-        const now = new Date().toISOString();
-        
-        setTasks(prev => prev.map(task => {
-            if (task.id === taskId) {
-                return {
-                    ...task,
-                    active_timer: {
-                        start_time: now,
-                        elapsed: 0
-                    }
-                };
-            }
-            // Stop other timers - only one timer at a time
-            if (task.active_timer) {
-                return {
-                    ...task,
-                    active_timer: null
-                };
-            }
-            return task;
-        }));
-
-        // Clear any existing timers
-        activeTimers.forEach(timer => clearInterval(timer));
-        activeTimers.clear();
-
-        // Start new timer that updates every second
-        const interval = setInterval(() => {
-            setTasks(prev => prev.map(task => {
-                if (task.id === taskId && task.active_timer) {
-                    const elapsed = Math.floor((Date.now() - new Date(task.active_timer.start_time).getTime()) / 1000);
-                    return {
-                        ...task,
-                        active_timer: {
-                            ...task.active_timer,
-                            elapsed
-                        }
-                    };
-                }
-                return task;
-            }));
-        }, 1000);
-
-        setActiveTimers(prev => new Map(prev).set(taskId, interval));
-    };
-
-    const stopTimer = (taskId: string) => {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task?.active_timer) return;
-
-        const totalSeconds = task.active_timer.elapsed;
-        const minutesToAdd = Math.floor(totalSeconds / 60);
-
-        setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-                return {
-                    ...t,
-                    total_time_logged: (t.total_time_logged || 0) + minutesToAdd,
-                    active_timer: null
-                };
-            }
-            return t;
-        }));
-
-        // Clear the timer
-        const timer = activeTimers.get(taskId);
-        if (timer) {
-            clearInterval(timer);
-            setActiveTimers(prev => {
-                const newMap = new Map(prev);
-                newMap.delete(taskId);
-                return newMap;
-            });
-        }
-
-        // TODO: Save time entry to database
-        if (minutesToAdd > 0) {
-            saveTimeEntry(taskId, minutesToAdd);
-        }
-    };
-
-    const saveTimeEntry = async (taskId: string, minutes: number) => {
-        try {
-            // This would save to a time_entries table
-            const response = await fetch('/api/time-entries', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    task_id: taskId,
-                    minutes,
-                    date: new Date().toISOString().split('T')[0]
-                })
-            });
-
-            if (!response.ok) {
-                console.error('Failed to save time entry');
-            }
-        } catch (error) {
-            console.error('Error saving time entry:', error);
-        }
-    };
-
-    const formatTime = (seconds: number) => {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-        
-        if (hours > 0) {
-            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const formatDuration = (minutes: number) => {
-        if (minutes < 60) {
+    const formatHours = (hours: number) => {
+        if (hours === 0) return '0h';
+        if (hours < 1) {
+            const minutes = Math.round(hours * 60);
             return `${minutes}m`;
         }
-        const hours = Math.floor(minutes / 60);
-        const remainingMinutes = minutes % 60;
-        return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+        const wholeHours = Math.floor(hours);
+        const remainingMinutes = Math.round((hours - wholeHours) * 60);
+        return remainingMinutes > 0 ? `${wholeHours}h ${remainingMinutes}m` : `${wholeHours}h`;
     };
-
-    // Cleanup timers on unmount
-    useEffect(() => {
-        return () => {
-            activeTimers.forEach(timer => clearInterval(timer));
-        };
-    }, []);
 
     const handleSort = (field: SortField) => {
         const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
@@ -522,6 +397,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                             <ArrowUpDown className='h-3 w-3' />
                                         </button>
                                     </th>
+                                    <th className='p-3 w-24'>Estimate</th>
+                                    <th className='p-3 w-24'>Billable</th>
                                     <th className='p-3 w-32'>
                                         <button 
                                             onClick={() => handleSort('updated_at')}
@@ -530,8 +407,6 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                             <ArrowUpDown className='h-3 w-3' />
                                         </button>
                                     </th>
-                                    <th className='p-3 w-32'>Time Tracked</th>
-                                    <th className='p-3 w-24'>Timer</th>
                                     <th className='p-3 w-16'>Actions</th>
                                 </tr>
                             </thead>
@@ -607,44 +482,31 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                                 )}
                                             </td>
                                             <td className='p-3'>
-                                                <span className='text-sm text-muted-foreground'>
-                                                    {new Date(task.updated_at).toLocaleDateString()}
-                                                </span>
+                                                <div className='text-sm'>
+                                                    {task.estimate_hours ? (
+                                                        <span className='font-medium text-muted-foreground'>
+                                                            {formatHours(task.estimate_hours)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className='text-muted-foreground'>No estimate</span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className='p-3'>
                                                 <div className='text-sm'>
-                                                    {(task.total_time_logged || 0) > 0 ? (
-                                                        <span className='font-medium text-foreground'>
-                                                            {formatDuration(task.total_time_logged || 0)}
+                                                    {task.billable_hours ? (
+                                                        <span className='font-medium text-green-600 dark:text-green-400'>
+                                                            {formatHours(task.billable_hours)}
                                                         </span>
                                                     ) : (
-                                                        <span className='text-muted-foreground'>No time</span>
+                                                        <span className='text-muted-foreground'>No billable</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className='p-3'>
-                                                <div className='flex items-center gap-1'>
-                                                    {task.active_timer ? (
-                                                        <>
-                                                            <div className='text-sm font-mono text-blue-600 dark:text-blue-400'>
-                                                                {formatTime(task.active_timer.elapsed)}
-                                                            </div>
-                                                            <button 
-                                                                onClick={() => stopTimer(task.id)}
-                                                                className='rounded p-1 hover:bg-secondary text-red-600 transition-colors'
-                                                                title='Stop timer'>
-                                                                <Square className='h-3 w-3' />
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={() => startTimer(task.id)}
-                                                            className='rounded p-1 hover:bg-secondary text-green-600 transition-colors'
-                                                            title='Start timer'>
-                                                            <Play className='h-3 w-3' />
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                <span className='text-sm text-muted-foreground'>
+                                                    {new Date(task.updated_at).toLocaleDateString()}
+                                                </span>
                                             </td>
                                             <td className='p-3'>
                                                 <div className='flex items-center gap-1'>
@@ -773,15 +635,31 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                 </div>
                             </div>
 
-                            <div>
-                                <label className='mb-2 block text-sm font-medium'>Estimate</label>
-                                <input
-                                    type='text'
-                                    value={taskForm.estimate}
-                                    onChange={(e) => setTaskForm((prev) => ({ ...prev, estimate: e.target.value }))}
-                                    className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
-                                    placeholder='e.g., 2 hours, 1 day'
-                                />
+                            <div className='grid grid-cols-2 gap-4'>
+                                <div>
+                                    <label className='mb-2 block text-sm font-medium'>Estimate Hours</label>
+                                    <input
+                                        type='number'
+                                        step='0.25'
+                                        min='0'
+                                        value={taskForm.estimate_hours}
+                                        onChange={(e) => setTaskForm((prev) => ({ ...prev, estimate_hours: e.target.value }))}
+                                        className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
+                                        placeholder='e.g., 2.5'
+                                    />
+                                </div>
+                                <div>
+                                    <label className='mb-2 block text-sm font-medium'>Billable Hours</label>
+                                    <input
+                                        type='number'
+                                        step='0.25'
+                                        min='0'
+                                        value={taskForm.billable_hours}
+                                        onChange={(e) => setTaskForm((prev) => ({ ...prev, billable_hours: e.target.value }))}
+                                        className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
+                                        placeholder='e.g., 2.0'
+                                    />
+                                </div>
                             </div>
 
                             {/* Labels */}
