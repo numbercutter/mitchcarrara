@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { isEmailApproved } from '@/lib/approved-emails';
+import { isEmailApprovedAsync } from '@/lib/approved-emails';
 
 export async function middleware(request: NextRequest) {
     console.log('🚦 Middleware hit:', request.nextUrl.pathname);
@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
 
     // If user is signed in, check if their email is approved
     if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
-        if (!user.email || !isEmailApproved(user.email)) {
+        if (!user.email || !(await isEmailApprovedAsync(user.email))) {
             console.log(`🚫 Unauthorized email: ${user.email}`);
             return NextResponse.redirect(new URL('/auth/unauthorized', request.url));
         }
