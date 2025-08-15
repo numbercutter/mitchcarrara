@@ -76,10 +76,18 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
 
     // Calculate billing statistics from tasks
     const calculateBillingStats = () => {
-        const totalEstimatedHours = tasks.reduce((sum, task) => sum + (task.estimate_hours || 0), 0);
-        const totalBillableHours = tasks.reduce((sum, task) => sum + (task.billable_hours || 0), 0);
+        // Parse estimate from string to hours (e.g., "2.5" -> 2.5, "2 hours" -> 2)
+        const parseHours = (estimate: string | null): number => {
+            if (!estimate) return 0;
+            const match = estimate.toString().match(/(\d+(?:\.\d+)?)/);
+            return match ? parseFloat(match[1]) : 0;
+        };
+
+        const totalEstimatedHours = tasks.reduce((sum, task) => sum + parseHours(task.estimate), 0);
+        // For now, use estimate as billable hours until database is updated
+        const totalBillableHours = tasks.filter(task => task.status === 'done').reduce((sum, task) => sum + parseHours(task.estimate), 0);
         const completedTasks = tasks.filter(task => task.status === 'done');
-        const completedBillableHours = completedTasks.reduce((sum, task) => sum + (task.billable_hours || 0), 0);
+        const completedBillableHours = completedTasks.reduce((sum, task) => sum + parseHours(task.estimate), 0);
         
         // Assuming $100/hour rate - this could be made configurable
         const hourlyRate = 100;

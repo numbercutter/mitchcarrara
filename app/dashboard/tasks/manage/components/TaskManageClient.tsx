@@ -57,8 +57,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         priority: 'medium',
         assignee: 'me',
         due_date: '',
-        estimate_hours: '',
-        billable_hours: '',
+        estimate: '',
         labels: [] as string[],
     });
     const [newLabel, setNewLabel] = useState('');
@@ -71,8 +70,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             priority: 'medium',
             assignee: 'me',
             due_date: '',
-            estimate_hours: '',
-            billable_hours: '',
+            estimate: '',
             labels: [],
         });
         setEditingTask(null);
@@ -89,8 +87,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             priority: task.priority || 'medium',
             assignee: task.assignee || 'me',
             due_date: task.due_date ? task.due_date.split('T')[0] : '',
-            estimate_hours: task.estimate_hours?.toString() || '',
-            billable_hours: task.billable_hours?.toString() || '',
+            estimate: task.estimate || '',
             labels: task.labels || [],
         });
         setShowNewTaskForm(true);
@@ -129,8 +126,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         priority: taskForm.priority,
                         assignee: taskForm.assignee,
                         due_date: taskForm.due_date || null,
-                        estimate_hours: taskForm.estimate_hours ? parseFloat(taskForm.estimate_hours) : null,
-                        billable_hours: taskForm.billable_hours ? parseFloat(taskForm.billable_hours) : null,
+                        estimate: taskForm.estimate || null,
                         labels: taskForm.labels,
                     }),
                 });
@@ -151,8 +147,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         priority: taskForm.priority,
                         assignee: taskForm.assignee,
                         due_date: taskForm.due_date || null,
-                        estimate_hours: taskForm.estimate_hours ? parseFloat(taskForm.estimate_hours) : null,
-                        billable_hours: taskForm.billable_hours ? parseFloat(taskForm.billable_hours) : null,
+                        estimate: taskForm.estimate || null,
                         labels: taskForm.labels,
                     }),
                 });
@@ -203,6 +198,12 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         } catch (error) {
             console.error('Error deleting task:', error);
         }
+    };
+
+    const parseHours = (estimate: string | null): number => {
+        if (!estimate) return 0;
+        const match = estimate.toString().match(/(\d+(?:\.\d+)?)/);
+        return match ? parseFloat(match[1]) : 0;
     };
 
     const formatHours = (hours: number) => {
@@ -398,7 +399,6 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                         </button>
                                     </th>
                                     <th className='p-3 w-24'>Estimate</th>
-                                    <th className='p-3 w-24'>Billable</th>
                                     <th className='p-3 w-32'>
                                         <button 
                                             onClick={() => handleSort('updated_at')}
@@ -483,23 +483,12 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                             </td>
                                             <td className='p-3'>
                                                 <div className='text-sm'>
-                                                    {task.estimate_hours ? (
+                                                    {task.estimate ? (
                                                         <span className='font-medium text-muted-foreground'>
-                                                            {formatHours(task.estimate_hours)}
+                                                            {formatHours(parseHours(task.estimate))}
                                                         </span>
                                                     ) : (
                                                         <span className='text-muted-foreground'>No estimate</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className='p-3'>
-                                                <div className='text-sm'>
-                                                    {task.billable_hours ? (
-                                                        <span className='font-medium text-green-600 dark:text-green-400'>
-                                                            {formatHours(task.billable_hours)}
-                                                        </span>
-                                                    ) : (
-                                                        <span className='text-muted-foreground'>No billable</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -635,31 +624,18 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                 </div>
                             </div>
 
-                            <div className='grid grid-cols-2 gap-4'>
-                                <div>
-                                    <label className='mb-2 block text-sm font-medium'>Estimate Hours</label>
-                                    <input
-                                        type='number'
-                                        step='0.25'
-                                        min='0'
-                                        value={taskForm.estimate_hours}
-                                        onChange={(e) => setTaskForm((prev) => ({ ...prev, estimate_hours: e.target.value }))}
-                                        className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
-                                        placeholder='e.g., 2.5'
-                                    />
-                                </div>
-                                <div>
-                                    <label className='mb-2 block text-sm font-medium'>Billable Hours</label>
-                                    <input
-                                        type='number'
-                                        step='0.25'
-                                        min='0'
-                                        value={taskForm.billable_hours}
-                                        onChange={(e) => setTaskForm((prev) => ({ ...prev, billable_hours: e.target.value }))}
-                                        className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
-                                        placeholder='e.g., 2.0'
-                                    />
-                                </div>
+                            <div>
+                                <label className='mb-2 block text-sm font-medium'>Estimate (hours)</label>
+                                <input
+                                    type='text'
+                                    value={taskForm.estimate}
+                                    onChange={(e) => setTaskForm((prev) => ({ ...prev, estimate: e.target.value }))}
+                                    className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
+                                    placeholder='e.g., 2.5, 3 hours, 1.5h'
+                                />
+                                <p className='mt-1 text-xs text-muted-foreground'>
+                                    Enter hours as number (e.g., 2.5) or with units (e.g., 3 hours)
+                                </p>
                             </div>
 
                             {/* Labels */}
