@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
 import { revalidatePath } from 'next/cache';
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
+        const params = await context.params;
         const taskId = params.id;
 
         // Update the task with the provided data
@@ -34,9 +35,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         const { supabase, userId } = await getDatabaseContext();
+        const params = await context.params;
         const taskId = params.id;
 
         const { error } = await supabase.from('tasks').delete().eq('id', taskId).eq('user_id', userId); // Ensure user can only delete their own tasks
