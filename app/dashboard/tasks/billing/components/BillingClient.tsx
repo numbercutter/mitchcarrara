@@ -30,6 +30,10 @@ type Task = {
     estimate: string | null;
     labels: string[] | null;
     assignee: string | null;
+    payment_status: 'paid' | 'unpaid' | 'pending' | null;
+    payment_amount: number | null;
+    payment_date: string | null;
+    payment_notes: string | null;
     time_entries: TimeEntry[];
 };
 
@@ -65,8 +69,8 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
             const taskMinutes = task.time_entries.reduce((sum, entry) => sum + entry.minutes, 0);
             totalMinutes += taskMinutes;
 
-            // Check if task is marked as paid (using labels array)
-            if (task.labels?.includes('paid')) {
+            // Check if task is marked as paid using payment_status
+            if (task.payment_status === 'paid') {
                 paidMinutes += taskMinutes;
             }
         });
@@ -96,10 +100,13 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
         }
 
         // Payment filter
-        if (filterPayment === 'paid' && !task.labels?.includes('paid')) {
+        if (filterPayment === 'paid' && task.payment_status !== 'paid') {
             return false;
         }
-        if (filterPayment === 'unpaid' && task.labels?.includes('paid')) {
+        if (filterPayment === 'unpaid' && task.payment_status === 'paid') {
+            return false;
+        }
+        if (filterPayment === 'pending' && task.payment_status !== 'pending') {
             return false;
         }
 
@@ -127,26 +134,50 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
             const task = tasks.find((t) => t.id === taskId);
             if (!task) return;
 
-            const currentLabels = task.labels || [];
-            const isPaid = currentLabels.includes('paid');
+            const currentStatus = task.payment_status || 'unpaid';
+            let newStatus: 'paid' | 'unpaid' | 'pending';
+            let payment_date: string | null = null;
+            let payment_amount: number | null = null;
 
-            let newLabels;
-            if (isPaid) {
-                // Remove 'paid' label
-                newLabels = currentLabels.filter((label) => label !== 'paid');
+            // Cycle through statuses: unpaid -> pending -> paid -> unpaid
+            if (currentStatus === 'unpaid') {
+                newStatus = 'pending';
+            } else if (currentStatus === 'pending') {
+                newStatus = 'paid';
+                payment_date = new Date().toISOString();
+                // Calculate payment amount based on time entries and hourly rate
+                const taskMinutes = task.time_entries.reduce((sum, entry) => sum + entry.minutes, 0);
+                const hours = taskMinutes / 60;
+                payment_amount = Math.round(hours * hourlyRate * 100) / 100;
             } else {
-                // Add 'paid' label
-                newLabels = [...currentLabels, 'paid'];
+                newStatus = 'unpaid';
+                payment_date = null;
+                payment_amount = null;
             }
 
             const response = await fetch(`/api/tasks/${taskId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ labels: newLabels }),
+                body: JSON.stringify({
+                    payment_status: newStatus,
+                    payment_date,
+                    payment_amount,
+                }),
             });
 
             if (response.ok) {
-                setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, labels: newLabels } : t)));
+                setTasks((prev) =>
+                    prev.map((t) =>
+                        t.id === taskId
+                            ? {
+                                  ...t,
+                                  payment_status: newStatus,
+                                  payment_date,
+                                  payment_amount,
+                              }
+                            : t
+                    )
+                );
             }
         } catch (error) {
             console.error('Error updating payment status:', error);
@@ -271,6 +302,7 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
                                     <SelectItem value='all'>All</SelectItem>
                                     <SelectItem value='paid'>Paid</SelectItem>
                                     <SelectItem value='unpaid'>Unpaid</SelectItem>
+                                    <SelectItem value='pending'>Pending</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -292,9 +324,35 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
                 <CardContent>
                     <div className='space-y-4'>
                         {filteredTasks.map((task) => {
-                            const isPaid = task.labels?.includes('paid');
+                            const paymentStatus = task.payment_status || 'unpaid';
                             const taskHours = getTaskHours(task);
                             const taskEarnings = getTaskEarnings(task);
+
+                            const getPaymentBadgeVariant = () => {
+                                switch (paymentStatus) {
+                                    case 'paid':
+                                        return 'default';
+                                    case 'pending':
+                                        return 'secondary';
+                                    case 'unpaid':
+                                        return 'destructive';
+                                    default:
+                                        return 'destructive';
+                                }
+                            };
+
+                            const getPaymentButtonText = () => {
+                                switch (paymentStatus) {
+                                    case 'unpaid':
+                                        return 'Mark Pending';
+                                    case 'pending':
+                                        return 'Mark Paid';
+                                    case 'paid':
+                                        return 'Mark Unpaid';
+                                    default:
+                                        return 'Mark Pending';
+                                }
+                            };
 
                             return (
                                 <div key={task.id} className='flex items-center justify-between rounded-lg border p-4'>
@@ -302,7 +360,7 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
                                         <div className='mb-2 flex items-center gap-2'>
                                             <h3 className='font-semibold'>{task.title}</h3>
                                             <Badge variant={task.status === 'completed' ? 'default' : 'secondary'}>{task.status}</Badge>
-                                            <Badge variant={isPaid ? 'default' : 'destructive'}>{isPaid ? 'Paid' : 'Unpaid'}</Badge>
+                                            <Badge variant={getPaymentBadgeVariant()}>{paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}</Badge>
                                         </div>
 
                                         {task.description && <p className='mb-2 text-sm text-muted-foreground'>{task.description}</p>}
@@ -313,20 +371,31 @@ export default function BillingClient({ initialTasks }: BillingClientProps) {
                                                 {taskHours}h tracked
                                             </div>
                                             <div className='flex items-center gap-1'>
-                                                <DollarSign className='h-4 w-4' />${taskEarnings}
+                                                <DollarSign className='h-4 w-4' />
+                                                {task.payment_amount ? `$${task.payment_amount}` : `$${taskEarnings} est.`}
                                             </div>
+                                            {task.payment_date && (
+                                                <div className='flex items-center gap-1'>
+                                                    <CheckCircle className='h-4 w-4' />
+                                                    Paid {format(parseISO(task.payment_date), 'MMM d, yyyy')}
+                                                </div>
+                                            )}
                                             {task.created_at && (
                                                 <div className='flex items-center gap-1'>
                                                     <Calendar className='h-4 w-4' />
-                                                    {format(parseISO(task.created_at), 'MMM d, yyyy')}
+                                                    Created {format(parseISO(task.created_at), 'MMM d, yyyy')}
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
                                     <div className='flex items-center gap-2'>
-                                        <Button variant={isPaid ? 'destructive' : 'default'} size='sm' onClick={() => togglePaymentStatus(task.id)} disabled={taskHours === 0}>
-                                            {isPaid ? 'Mark Unpaid' : 'Mark Paid'}
+                                        <Button
+                                            variant={paymentStatus === 'paid' ? 'destructive' : 'default'}
+                                            size='sm'
+                                            onClick={() => togglePaymentStatus(task.id)}
+                                            disabled={taskHours === 0}>
+                                            {getPaymentButtonText()}
                                         </Button>
                                     </div>
                                 </div>

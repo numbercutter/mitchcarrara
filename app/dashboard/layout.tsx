@@ -27,6 +27,7 @@ import {
     Clock,
     LogOut,
     DollarSign,
+    StickyNote,
 } from 'lucide-react';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { CompanySelector } from '../components/CompanySelector';
@@ -38,6 +39,7 @@ import UserContextIndicator from './components/UserContextIndicator';
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Vision Board', href: '/dashboard/vision', icon: Eye },
+    { name: 'Notes', href: '/dashboard/notes', icon: StickyNote },
     {
         name: 'Personal',
         href: '/dashboard/personal',
