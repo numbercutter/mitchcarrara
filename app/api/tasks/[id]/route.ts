@@ -1,32 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabaseContext } from '@/lib/database/server-helpers';
-import { TablesUpdate } from '@/types/database';
+import { revalidatePath } from 'next/cache';
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { supabase } = await getDatabaseContext();
+        const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
-        const { id: taskId } = await params;
+        const taskId = params.id;
 
-        const updateData: TablesUpdate<'tasks'> = {};
-
-        // Only include fields that are being updated
-        if (body.title !== undefined) updateData.title = body.title;
-        if (body.description !== undefined) updateData.description = body.description;
-        if (body.status !== undefined) updateData.status = body.status;
-        if (body.priority !== undefined) updateData.priority = body.priority;
-        if (body.assignee !== undefined) updateData.assignee = body.assignee;
-        if (body.due_date !== undefined) updateData.due_date = body.due_date;
-        if (body.estimate !== undefined) updateData.estimate = body.estimate;
-        if (body.labels !== undefined) updateData.labels = body.labels;
-
+        // Update the task with the provided data
         const { data, error } = await supabase
             .from('tasks')
             .update({
-                ...updateData,
+                ...body,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', taskId)
+            .eq('user_id', userId) // Ensure user can only update their own tasks
             .select()
             .single();
 
@@ -35,6 +25,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
+        revalidatePath('/dashboard/tasks');
+        revalidatePath('/dashboard/tasks/billing');
         return NextResponse.json(data);
     } catch (error) {
         console.error('Error updating task:', error);
@@ -42,19 +34,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { supabase } = await getDatabaseContext();
-        const { id: taskId } = await params;
+        const { supabase, userId } = await getDatabaseContext();
+        const taskId = params.id;
 
-        const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+        const { error } = await supabase.from('tasks').delete().eq('id', taskId).eq('user_id', userId); // Ensure user can only delete their own tasks
 
         if (error) {
             console.error('Error deleting task:', error);
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        return NextResponse.json({ success: true });
+        revalidatePath('/dashboard/tasks');
+        revalidatePath('/dashboard/tasks/billing');
+        return NextResponse.json({ message: 'Task deleted successfully' });
     } catch (error) {
         console.error('Error deleting task:', error);
         return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
