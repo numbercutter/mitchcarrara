@@ -31,6 +31,13 @@ const eventTypeColors = {
     'task-done': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300',
 };
 
+// Helper function to parse due dates as local dates to avoid timezone issues
+const parseLocalDate = (dateString: string): Date => {
+    // Split the date string and create a date in local timezone
+    const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+    return new Date(year, month - 1, day); // month is 0-indexed
+};
+
 export default function CalendarClient({ initialEvents, initialTasks, initialContacts }: CalendarClientProps) {
     const [events, setEvents] = useState<CalendarEvent[]>(initialEvents);
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -153,11 +160,11 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
     // Generate birthday events for the current year
     const generateBirthdayEvents = () => {
         return contacts
-            .filter(contact => contact.birthday)
-            .map(contact => {
+            .filter((contact) => contact.birthday)
+            .map((contact) => {
                 const birthdayDate = new Date(contact.birthday!);
                 const thisYearBirthday = new Date(currentYear, birthdayDate.getMonth(), birthdayDate.getDate());
-                
+
                 return {
                     id: `birthday-${contact.id}`,
                     type: 'birthday',
@@ -165,7 +172,7 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                     description: `${contact.relationship ? `${contact.relationship} - ` : ''}Birthday celebration`,
                     date: thisYearBirthday,
                     contact: contact,
-                    event_type: 'birthday'
+                    event_type: 'birthday',
                 };
             });
     };
@@ -179,13 +186,13 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
     });
 
     // Filter birthday events for current month
-    const birthdayEvents = generateBirthdayEvents().filter(birthday => {
+    const birthdayEvents = generateBirthdayEvents().filter((birthday) => {
         return birthday.date.getMonth() === currentMonth && birthday.date.getFullYear() === currentYear;
     });
 
     // Filter tasks for current month based on due_date or created_at
     const monthTasks = tasks.filter((task) => {
-        const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+        const taskDate = task.due_date ? parseLocalDate(task.due_date) : new Date(task.created_at);
         return taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear;
     });
 
@@ -210,7 +217,7 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
 
     // Group tasks by date and add to the same structure
     const itemsByDate = monthTasks.reduce((acc, task) => {
-        const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+        const taskDate = task.due_date ? parseLocalDate(task.due_date) : new Date(task.created_at);
         const dateKey = taskDate.toDateString();
         if (!acc[dateKey]) acc[dateKey] = [];
         acc[dateKey].push({ ...task, type: 'task' });
@@ -372,7 +379,7 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                                         <div className='flex-1'>
                                             <div className='mb-2 flex items-center gap-3'>
                                                 <span className={`rounded px-2 py-1 text-xs ${eventTypeColors.birthday}`}>Birthday</span>
-                                                <h3 className='font-semibold flex items-center gap-2'>
+                                                <h3 className='flex items-center gap-2 font-semibold'>
                                                     <Gift className='h-4 w-4' />
                                                     {birthday.title}
                                                 </h3>
@@ -455,7 +462,7 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                             {monthTasks.map((task) => {
                                 const status = task.status || 'todo';
                                 const typeColor = eventTypeColors[`task-${status}` as keyof typeof eventTypeColors] || eventTypeColors['task-todo'];
-                                const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+                                const taskDate = task.due_date ? parseLocalDate(task.due_date) : new Date(task.created_at);
 
                                 return (
                                     <div key={`task-${task.id}`} className='rounded-lg border border-l-4 border-l-blue-500 bg-card p-6 transition-shadow hover:shadow-md'>

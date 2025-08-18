@@ -36,6 +36,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import LogoutButton from '@/components/auth/LogoutButton';
 import UserContextIndicator from './components/UserContextIndicator';
 
+// Main navigation for desktop sidebar and mobile bottom bar
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Vision Board', href: '/dashboard/vision', icon: Eye },
@@ -61,7 +62,6 @@ const navigation = [
             { name: 'Overview', href: '/dashboard/tasks', icon: LayoutDashboard },
             { name: 'Manage Tasks', href: '/dashboard/tasks/manage', icon: CheckSquare },
             { name: 'Calendar', href: '/dashboard/tasks/calendar', icon: Calendar },
-            { name: 'Billing', href: '/dashboard/tasks/billing', icon: DollarSign },
         ],
     },
     {
@@ -75,6 +75,15 @@ const navigation = [
             { name: 'Support', href: '/dashboard/companies/support', icon: Mail },
         ],
     },
+];
+
+// Simplified navigation for mobile bottom bar (main sections only)
+const mobileNavigation = [
+    { name: 'Home', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Notes', href: '/dashboard/notes', icon: StickyNote },
+    { name: 'Personal', href: '/dashboard/personal', icon: Heart },
+    { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare },
+    { name: 'More', href: '/dashboard/companies', icon: Building2 },
 ];
 
 function useDarkMode() {
@@ -151,81 +160,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return null;
     }
 
-    const sidebarContent = (
-        <>
-            {/* Mobile sidebar */}
-            <div className={`fixed inset-0 z-40 lg:hidden ${sidebarOpen ? '' : 'hidden'}`}>
-                <div className='fixed inset-0 bg-black/60 backdrop-blur-sm' onClick={() => setSidebarOpen(false)} />
-                <div className='fixed inset-y-0 left-0 flex w-64 flex-col border-r border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
-                    <div className='flex h-16 items-center justify-between border-b border-border/50 px-4'>
-                        <span className='text-xl font-semibold tracking-tight text-foreground'>Dashboard</span>
-                        <button onClick={() => setSidebarOpen(false)} className='text-foreground/70 hover:text-foreground'>
-                            <X className='h-6 w-6' />
-                        </button>
-                    </div>
-                    <div className='flex-1 space-y-1 px-2 py-4'>
-                        {isCompaniesRoute && (
-                            <div className='px-2 pb-4'>
-                                <CompanySelector />
-                            </div>
-                        )}
-                        {navigation.map((item) => {
-                            const isActive = pathname === item.href;
-                            const hasChildren = item.children && item.children.length > 0;
-                            const isChildActive = hasChildren && item.children.some((child) => pathname === child.href || pathname.startsWith(child.href + '/'));
-                            const showChildren = hasChildren && (isActive || isChildActive || pathname.startsWith(item.href + '/'));
-
-                            return (
-                                <div key={item.name}>
-                                    <Link
-                                        href={item.href}
-                                        className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                            isActive || isChildActive
-                                                ? 'border border-primary/20 bg-primary/10 text-primary'
-                                                : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
-                                        }`}>
-                                        <item.icon className='mr-3 h-6 w-6' />
-                                        {item.name}
-                                    </Link>
-                                    {showChildren && (
-                                        <div className='ml-6 mt-1 space-y-1'>
-                                            {item.children.map((child) => {
-                                                const isChildItemActive = pathname === child.href;
-                                                return (
-                                                    <Link
-                                                        key={child.name}
-                                                        href={child.href}
-                                                        className={`group flex items-center rounded-md px-2 py-1 text-sm transition-colors ${
-                                                            isChildItemActive ? 'bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-secondary/30 hover:text-foreground'
-                                                        }`}>
-                                                        <child.icon className='mr-3 h-4 w-4' />
-                                                        {child.name}
-                                                    </Link>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                    {/* Account and Logout for mobile */}
-                    <div className='space-y-2 border-t border-border/50 p-4'>
-                        <Link
-                            href='/dashboard/settings'
-                            className={`group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors ${
-                                pathname.startsWith('/dashboard/settings')
-                                    ? 'border border-primary/20 bg-primary/10 text-primary'
-                                    : 'border border-transparent text-muted-foreground hover:border-border/50 hover:bg-secondary/50 hover:text-foreground'
-                            }`}>
-                            <Settings className='mr-3 h-5 w-5' />
-                            Settings
-                        </Link>
-                        <LogoutButton />
-                    </div>
+    // Mobile Bottom Navigation
+    const mobileBottomNav = (
+        <div className='fixed bottom-0 left-0 right-0 z-50 lg:hidden'>
+            <div className='border-t border-border/50 bg-card/95 px-2 py-2 backdrop-blur-md'>
+                <div className='flex items-center justify-around'>
+                    {mobileNavigation.map((item) => {
+                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                        return (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                className={`flex min-w-0 flex-1 flex-col items-center justify-center px-1 py-2 text-xs font-medium transition-colors ${
+                                    isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                                }`}>
+                                <item.icon className={`mb-1 h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
+                                <span className='truncate'>{item.name}</span>
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
+        </div>
+    );
 
+    const sidebarContent = (
+        <>
             {/* Desktop sidebar */}
             <div className='hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col'>
                 <div className='flex min-h-0 flex-1 flex-col border-r border-border/50 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-[0_0_15px_rgba(0,0,0,0.1)] backdrop-blur-sm dark:shadow-[0_0_15px_rgba(0,0,0,0.3)]'>
@@ -308,29 +268,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className={`transition-all duration-300 lg:pl-64 ${chatSidebarOpen ? 'lg:pr-80' : ''}`}>
                 {/* Top header */}
                 <div className='sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-gradient-to-br from-background via-background/95 to-background/90 px-4 shadow-sm backdrop-blur-sm'>
-                    <button onClick={() => setSidebarOpen(true)} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
+                    {/* Mobile: Just show title, no hamburger menu */}
+                    <div className='lg:hidden'>
+                        <span className='text-lg font-semibold text-foreground'>Dashboard</span>
+                    </div>
+                    {/* Desktop: Keep hamburger for potential future use */}
+                    <button onClick={() => setSidebarOpen(true)} className='hidden rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:block'>
                         <Menu className='h-6 w-6' />
                     </button>
-                    <div className='flex items-center gap-4'>
+                    <div className='flex items-center gap-2 lg:gap-4'>
                         <UserContextIndicator />
                         <button
                             onClick={() => setChatSidebarOpen(!chatSidebarOpen)}
                             className='rounded-md p-2 text-foreground/70 transition-colors hover:bg-secondary/50 hover:text-foreground'
                             title='Toggle Chat'>
-                            <MessageSquare className='h-5 w-5' />
+                            <MessageSquare className='h-4 w-4 lg:h-5 lg:w-5' />
                         </button>
                         <button onClick={toggleDark} className='rounded-md p-2 text-foreground/70 hover:bg-secondary/50 hover:text-foreground lg:hidden'>
-                            {isDark ? <Sun className='h-5 w-5' /> : <Moon className='h-5 w-5' />}
+                            {isDark ? <Sun className='h-4 w-4' /> : <Moon className='h-4 w-4' />}
                         </button>
                     </div>
                 </div>
 
-                {/* Page content */}
-                <main className='flex h-[calc(100vh-4rem)] flex-col p-6'>{children}</main>
+                {/* Page content - Adjusted for mobile bottom nav */}
+                <main className='flex flex-col p-3 pb-20 lg:h-[calc(100vh-4rem)] lg:p-6 lg:pb-6'>{children}</main>
             </div>
 
             {/* Chat Sidebar */}
             <ChatSidebar isOpen={chatSidebarOpen} onToggle={() => setChatSidebarOpen(!chatSidebarOpen)} />
+
+            {/* Mobile Bottom Navigation */}
+            {mobileBottomNav}
         </>
     );
 

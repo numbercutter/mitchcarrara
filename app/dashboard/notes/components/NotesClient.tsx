@@ -272,67 +272,69 @@ export default function NotesClient({ initialNotes, todayNote }: NotesClientProp
     };
 
     return (
-        <div className='container mx-auto space-y-6 p-6'>
+        <div className='mx-auto max-w-7xl space-y-4 lg:space-y-6'>
             {/* Header */}
-            <div className='flex items-center justify-between'>
+            <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
                 <div>
-                    <h1 className='text-3xl font-bold'>Notes</h1>
-                    <p className='text-muted-foreground'>Your personal note-taking space</p>
+                    <h1 className='text-2xl font-bold lg:text-3xl'>Notes</h1>
+                    <p className='text-sm text-muted-foreground lg:text-base'>Your personal note-taking space</p>
                 </div>
                 <div className='flex gap-2'>
-                    <Button onClick={handleDailyNote} variant='outline'>
+                    <Button onClick={handleDailyNote} variant='outline' size='sm' className='flex-1 lg:flex-none'>
                         <Calendar className='mr-2 h-4 w-4' />
-                        {dailyNote ? "Open Today's Note" : 'Create Daily Note'}
+                        <span className='hidden sm:inline'>{dailyNote ? "Open Today's Note" : 'Create Daily Note'}</span>
+                        <span className='sm:hidden'>Daily</span>
                     </Button>
-                    <Button onClick={() => setIsCreating(true)}>
+                    <Button onClick={() => setIsCreating(true)} size='sm' className='flex-1 lg:flex-none'>
                         <Plus className='mr-2 h-4 w-4' />
-                        New Note
+                        <span className='hidden sm:inline'>New Note</span>
+                        <span className='sm:hidden'>New</span>
                     </Button>
                 </div>
             </div>
 
             {/* Quick Stats */}
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-4'>
+            <div className='grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4'>
                 <Card>
-                    <CardContent className='p-4'>
+                    <CardContent className='p-3 lg:p-4'>
                         <div className='flex items-center'>
-                            <BookOpen className='h-8 w-8 text-blue-600' />
-                            <div className='ml-4'>
-                                <p className='text-sm font-medium text-muted-foreground'>Total Notes</p>
-                                <p className='text-2xl font-bold'>{notes.length}</p>
+                            <BookOpen className='h-6 w-6 text-blue-600 lg:h-8 lg:w-8' />
+                            <div className='ml-3 lg:ml-4'>
+                                <p className='text-xs font-medium text-muted-foreground lg:text-sm'>Total Notes</p>
+                                <p className='text-lg font-bold lg:text-2xl'>{notes.length}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent className='p-4'>
+                    <CardContent className='p-3 lg:p-4'>
                         <div className='flex items-center'>
-                            <Pin className='h-8 w-8 text-yellow-600' />
-                            <div className='ml-4'>
-                                <p className='text-sm font-medium text-muted-foreground'>Pinned</p>
-                                <p className='text-2xl font-bold'>{notes.filter((n) => n.is_pinned).length}</p>
+                            <Pin className='h-6 w-6 text-yellow-600 lg:h-8 lg:w-8' />
+                            <div className='ml-3 lg:ml-4'>
+                                <p className='text-xs font-medium text-muted-foreground lg:text-sm'>Pinned</p>
+                                <p className='text-lg font-bold lg:text-2xl'>{notes.filter((n) => n.is_pinned).length}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent className='p-4'>
+                    <CardContent className='p-3 lg:p-4'>
                         <div className='flex items-center'>
-                            <Calendar className='h-8 w-8 text-green-600' />
-                            <div className='ml-4'>
-                                <p className='text-sm font-medium text-muted-foreground'>Daily Notes</p>
-                                <p className='text-2xl font-bold'>{notes.filter((n) => n.note_type === 'daily').length}</p>
+                            <Calendar className='h-6 w-6 text-green-600 lg:h-8 lg:w-8' />
+                            <div className='ml-3 lg:ml-4'>
+                                <p className='text-xs font-medium text-muted-foreground lg:text-sm'>Daily Notes</p>
+                                <p className='text-lg font-bold lg:text-2xl'>{notes.filter((n) => n.note_type === 'daily').length}</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent className='p-4'>
+                    <CardContent className='p-3 lg:p-4'>
                         <div className='flex items-center'>
-                            <FileText className='h-8 w-8 text-purple-600' />
-                            <div className='ml-4'>
-                                <p className='text-sm font-medium text-muted-foreground'>Projects</p>
-                                <p className='text-2xl font-bold'>{notes.filter((n) => n.note_type === 'project').length}</p>
+                            <FileText className='h-6 w-6 text-purple-600 lg:h-8 lg:w-8' />
+                            <div className='ml-3 lg:ml-4'>
+                                <p className='text-xs font-medium text-muted-foreground lg:text-sm'>Projects</p>
+                                <p className='text-lg font-bold lg:text-2xl'>{notes.filter((n) => n.note_type === 'project').length}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -348,28 +350,30 @@ export default function NotesClient({ initialNotes, todayNote }: NotesClientProp
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className='flex flex-wrap gap-4'>
-                        <div className='min-w-64 flex-1'>
-                            <Label>Search Notes</Label>
-                            <div className='relative'>
-                                <Search className='absolute left-2 top-3 h-4 w-4 text-muted-foreground' />
-                                <Input placeholder='Search titles and content...' value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className='pl-8' />
+                    <div className='space-y-4'>
+                        <div className='flex flex-col gap-4 sm:flex-row'>
+                            <div className='flex-1'>
+                                <Label className='text-sm'>Search Notes</Label>
+                                <div className='relative mt-1'>
+                                    <Search className='absolute left-3 top-3 h-4 w-4 text-muted-foreground' />
+                                    <Input placeholder='Search titles and content...' value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className='h-10 pl-10' />
+                                </div>
                             </div>
-                        </div>
-                        <div>
-                            <Label>Note Type</Label>
-                            <Select value={filterType} onValueChange={setFilterType}>
-                                <SelectTrigger className='w-40'>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value='all'>All Types</SelectItem>
-                                    <SelectItem value='daily'>Daily</SelectItem>
-                                    <SelectItem value='general'>General</SelectItem>
-                                    <SelectItem value='project'>Project</SelectItem>
-                                    <SelectItem value='meeting'>Meeting</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <div className='w-full sm:w-40'>
+                                <Label className='text-sm'>Note Type</Label>
+                                <Select value={filterType} onValueChange={setFilterType}>
+                                    <SelectTrigger className='mt-1 h-10'>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value='all'>All Types</SelectItem>
+                                        <SelectItem value='daily'>Daily</SelectItem>
+                                        <SelectItem value='general'>General</SelectItem>
+                                        <SelectItem value='project'>Project</SelectItem>
+                                        <SelectItem value='meeting'>Meeting</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
                     {allTags.length > 0 && (
@@ -499,7 +503,7 @@ export default function NotesClient({ initialNotes, todayNote }: NotesClientProp
             )}
 
             {/* Notes List */}
-            <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
+            <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
                 {sortedNotes.map((note) => (
                     <Card key={note.id} className='relative'>
                         {note.is_pinned && <Pin className='absolute right-2 top-2 h-4 w-4 fill-yellow-100 text-yellow-600' />}
