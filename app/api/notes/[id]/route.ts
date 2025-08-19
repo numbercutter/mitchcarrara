@@ -34,14 +34,20 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const params = await context.params;
         const noteId = params.id;
 
+        // Extract edit tracking info
+        const { user_name, user_email, ...updateData } = body;
+
+        // Get existing note to check for content changes
+        const { data: existingNote } = await supabase.from('notes').select('content').eq('id', noteId).eq('user_id', userId).single();
+
         // If updating to daily note type, check for conflicts
-        if (body.note_type === 'daily' && body.note_date) {
+        if (updateData.note_type === 'daily' && updateData.note_date) {
             const { data: existingDaily } = await supabase
                 .from('notes')
                 .select('id')
                 .eq('user_id', userId)
                 .eq('note_type', 'daily')
-                .eq('note_date', body.note_date)
+                .eq('note_date', updateData.note_date)
                 .eq('is_archived', false)
                 .neq('id', noteId) // Exclude current note
                 .single();
@@ -55,7 +61,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         const { data, error } = await supabase
             .from('notes')
             .update({
-                ...body,
+                ...updateData,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', noteId)
@@ -66,6 +72,24 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         if (error) {
             console.error('Error updating note:', error);
             return NextResponse.json({ error: error.message }, { status: 400 });
+        }
+
+        // Create edit history entry if content changed
+        if (updateData.content && existingNote && updateData.content !== existingNote.content) {
+            const { error: historyError } = await supabase.from('note_edit_history').insert({
+                note_id: noteId,
+                user_id: userId,
+                user_name: user_name || user_email?.split('@')[0] || 'Unknown',
+                user_email: user_email || '',
+                content_change: updateData.content.substring(0, 500), // Store first 500 chars
+                edit_type: 'update',
+                timestamp: new Date().toISOString(),
+            });
+
+            if (historyError) {
+                console.error('Error creating edit history:', historyError);
+                // Don't fail the request, just log the error
+            }
         }
 
         revalidatePath('/dashboard/notes');

@@ -178,6 +178,30 @@ export type Database = {
           },
         ]
       }
+      collaborative_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          last_edited_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          last_edited_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          last_edited_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           address: string | null
@@ -599,6 +623,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      note_edit_history: {
+        Row: {
+          content_change: string | null
+          edit_type: string
+          id: string
+          note_id: string | null
+          timestamp: string
+          user_email: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          content_change?: string | null
+          edit_type: string
+          id?: string
+          note_id?: string | null
+          timestamp?: string
+          user_email: string
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          content_change?: string | null
+          edit_type?: string
+          id?: string
+          note_id?: string | null
+          timestamp?: string
+          user_email?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_edit_history_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "collaborative_notes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notes: {
         Row: {
