@@ -19,12 +19,14 @@ import {
     Settings,
     DollarSign,
     CreditCard,
+    Plus,
 } from 'lucide-react';
 import { Tables } from '@/types/database';
 import { formatTimeAgo, getPriorityColor, getStatusColor } from '@/lib/database/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import TaskModal from './TaskModal';
 
 // Type helpers
 type Task = Tables<'tasks'> & {
@@ -71,6 +73,9 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [billingStats, setBillingStats] = useState<BillingStats | null>(initialBillingStats || null);
     const [isLoadingBillingStats, setIsLoadingBillingStats] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [isCreatingTask, setIsCreatingTask] = useState(false);
 
     const getTasksByStatus = (status: string) => {
         return tasks.filter((task) => task.status === status || (status === 'todo' && !task.status));
@@ -209,6 +214,67 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
     const billingData = calculateBillingStats();
     const completionProgress = billingData.totalEstimatedHours > 0 ? Math.round((billingData.completedHours / billingData.totalEstimatedHours) * 100) : 0;
 
+    // Task modal functions
+    const openTaskModal = (task?: Task) => {
+        setSelectedTask(task || null);
+        setIsCreatingTask(!task);
+        setIsTaskModalOpen(true);
+    };
+
+    const closeTaskModal = () => {
+        setSelectedTask(null);
+        setIsCreatingTask(false);
+        setIsTaskModalOpen(false);
+    };
+
+    const handleSaveTask = async (taskData: Partial<Task>) => {
+        try {
+            if (taskData.id) {
+                // Update existing task
+                const response = await fetch(`/api/tasks/${taskData.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taskData),
+                });
+
+                if (response.ok) {
+                    const updatedTask = await response.json();
+                    setTasks((prev) => prev.map((t) => (t.id === taskData.id ? updatedTask : t)));
+                }
+            } else {
+                // Create new task
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taskData),
+                });
+
+                if (response.ok) {
+                    const newTask = await response.json();
+                    setTasks((prev) => [newTask, ...prev]);
+                }
+            }
+            closeTaskModal();
+        } catch (error) {
+            console.error('Error saving task:', error);
+        }
+    };
+
+    const handleDeleteTask = async (taskId: string) => {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                setTasks((prev) => prev.filter((t) => t.id !== taskId));
+                closeTaskModal();
+            }
+        } catch (error) {
+            console.error('Error deleting task:', error);
+        }
+    };
+
     return (
         <div className='flex h-full min-h-0 flex-col'>
             {/* Sticky Header */}
@@ -218,10 +284,16 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                         <h1 className='text-3xl font-bold'>Tasks Overview</h1>
                         <p className='text-muted-foreground'>Statistical overview of all your tasks and productivity</p>
                     </div>
-                    <Link href='/dashboard/tasks/manage' className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                        <Settings className='h-4 w-4' />
-                        Manage Tasks
-                    </Link>
+                    <div className='flex items-center gap-2'>
+                        <Button onClick={() => openTaskModal()} className='flex items-center gap-2'>
+                            <Plus className='h-4 w-4' />
+                            New Task
+                        </Button>
+                        <Link href='/dashboard/tasks/manage' className='flex items-center gap-2 rounded-md bg-secondary px-4 py-2 text-secondary-foreground hover:bg-secondary/90'>
+                            <Settings className='h-4 w-4' />
+                            Manage Tasks
+                        </Link>
+                    </div>
                 </div>
             </div>
 
@@ -465,7 +537,10 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                                 };
 
                                 return (
-                                    <div key={task.id} className='flex flex-col gap-2 rounded-lg bg-secondary/20 p-3'>
+                                    <div
+                                        key={task.id}
+                                        className='flex cursor-pointer flex-col gap-2 rounded-lg bg-secondary/20 p-3 transition-colors hover:bg-secondary/30'
+                                        onClick={() => openTaskModal(task)}>
                                         <div className='flex items-center gap-3'>
                                             <Icon className={`h-4 w-4 ${config?.color || 'text-gray-500'}`} />
                                             <div className='min-w-0 flex-1'>
@@ -492,7 +567,10 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                                                 <Button
                                                     variant={paymentStatus === 'paid' ? 'destructive' : 'default'}
                                                     size='sm'
-                                                    onClick={() => togglePaymentStatus(task.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        togglePaymentStatus(task.id);
+                                                    }}
                                                     className='h-7 px-3 text-xs'>
                                                     {getPaymentButtonText()}
                                                 </Button>
@@ -522,6 +600,9 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                     </div>
                 )}
             </div>
+
+            {/* Task Modal */}
+            <TaskModal task={selectedTask} isOpen={isTaskModalOpen} onClose={closeTaskModal} onSave={handleSaveTask} onDelete={handleDeleteTask} />
         </div>
     );
 }

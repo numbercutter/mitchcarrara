@@ -299,6 +299,96 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
             </div>
 
             {/* Calendar Content */}
+            {viewMode === 'week' && (
+                <div className='rounded-lg border bg-card'>
+                    {/* Week Header */}
+                    <div className='grid grid-cols-7 border-b'>
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                            <div key={day} className='border-r p-4 text-center font-medium last:border-r-0'>
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Week Grid */}
+                    <div className='grid grid-cols-7'>
+                        {(() => {
+                            // Calculate week start (Sunday)
+                            const weekStart = new Date(currentDate);
+                            const dayOfWeek = weekStart.getDay(); // 0 = Sunday
+                            weekStart.setDate(weekStart.getDate() - dayOfWeek);
+
+                            // Generate 7 days for the week
+                            const weekDays = [];
+                            for (let i = 0; i < 7; i++) {
+                                const date = new Date(weekStart);
+                                date.setDate(weekStart.getDate() + i);
+                                const dateKey = date.toDateString();
+                                const dayItems = itemsByDate[dateKey] || [];
+                                weekDays.push({ day: date.getDate(), date, events: dayItems });
+                            }
+
+                            return weekDays.map((dayData, index) => (
+                                <div key={index} className='min-h-[150px] border-b border-r p-3 last:border-r-0'>
+                                    <div className='mb-3 flex items-center justify-between'>
+                                        <span
+                                            className={`text-lg font-medium ${
+                                                dayData.date.toDateString() === new Date().toDateString()
+                                                    ? 'flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground'
+                                                    : dayData.date.getMonth() !== currentDate.getMonth()
+                                                      ? 'text-muted-foreground'
+                                                      : ''
+                                            }`}>
+                                            {dayData.day}
+                                        </span>
+                                        <span className='text-xs text-muted-foreground'>{dayData.date.toLocaleDateString('en-US', { month: 'short' })}</span>
+                                    </div>
+                                    <div className='space-y-1'>
+                                        {dayData.events.map((item) => {
+                                            let typeColor;
+                                            let title;
+                                            let icon = null;
+
+                                            if (item.type === 'event') {
+                                                typeColor = eventTypeColors[item.event_type as keyof typeof eventTypeColors] || eventTypeColors.task;
+                                                title = item.title;
+                                            } else if (item.type === 'birthday') {
+                                                typeColor = eventTypeColors.birthday;
+                                                title = item.title;
+                                                icon = <Gift className='mr-1 inline h-3 w-3' />;
+                                            } else {
+                                                // It's a task
+                                                const status = item.status || 'todo';
+                                                typeColor = eventTypeColors[`task-${status}` as keyof typeof eventTypeColors] || eventTypeColors['task-todo'];
+                                                title = item.title;
+                                                icon = <CheckSquare className='mr-1 inline h-3 w-3' />;
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={`${item.type}-${item.id}`}
+                                                    className={`cursor-pointer truncate rounded p-2 text-xs hover:opacity-80 ${typeColor}`}
+                                                    title={`${item.type === 'task' ? 'Task: ' : item.type === 'birthday' ? 'Birthday: ' : 'Event: '}${title}`}
+                                                    onClick={() => {
+                                                        if (item.type === 'event') {
+                                                            editEvent(item);
+                                                        } else if (item.type === 'task') {
+                                                            window.location.href = '/dashboard/tasks/manage';
+                                                        }
+                                                    }}>
+                                                    {icon}
+                                                    {title}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ));
+                        })()}
+                    </div>
+                </div>
+            )}
+
             {viewMode === 'month' && (
                 <div className='rounded-lg border bg-card'>
                     {/* Calendar Header */}
@@ -352,7 +442,14 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                                                         key={`${item.type}-${item.id}`}
                                                         className={`cursor-pointer truncate rounded p-1 text-xs hover:opacity-80 ${typeColor}`}
                                                         title={`${item.type === 'task' ? 'Task: ' : item.type === 'birthday' ? 'Birthday: ' : 'Event: '}${title}`}
-                                                        onClick={() => (item.type === 'event' ? editEvent(item) : null)}>
+                                                        onClick={() => {
+                                                            if (item.type === 'event') {
+                                                                editEvent(item);
+                                                            } else if (item.type === 'task') {
+                                                                // Navigate to task management for editing
+                                                                window.location.href = '/dashboard/tasks/manage';
+                                                            }
+                                                        }}>
                                                         {icon}
                                                         {title}
                                                     </div>

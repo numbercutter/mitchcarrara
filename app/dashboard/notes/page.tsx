@@ -1,15 +1,31 @@
 import { getDatabaseContext } from '@/lib/database/server-helpers';
-import NotesClient from './components/NotesClient';
+import CollaborativeNotesClient from './components/CollaborativeNotesClient';
 
 export default async function NotesPage() {
     const { supabase, userId } = await getDatabaseContext();
 
-    // Fetch user's notes
-    const { data: notes } = await supabase.from('notes').select('*').eq('user_id', userId).eq('is_archived', false).order('updated_at', { ascending: false });
+    // Get current user info
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
 
-    // Get today's daily note if it exists
-    const today = new Date().toISOString().split('T')[0];
-    const { data: todayNote } = await supabase.from('notes').select('*').eq('user_id', userId).eq('note_type', 'daily').eq('note_date', today).eq('is_archived', false).single();
+    // Fetch collaborative note content
+    let content = '# Shared Notes\n\nWelcome to the collaborative notepad! Start typing here...\n\n';
 
-    return <NotesClient initialNotes={notes || []} todayNote={todayNote || null} />;
+    try {
+        const { data: note } = await supabase.from('collaborative_notes').select('content').single();
+
+        if (note?.content) {
+            content = note.content;
+        }
+    } catch (error) {
+        console.log('No collaborative note found, will create one');
+    }
+
+    const currentUser = {
+        email: user?.email || 'unknown@example.com',
+        name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Unknown User',
+    };
+
+    return <CollaborativeNotesClient initialContent={content} currentUser={currentUser} />;
 }

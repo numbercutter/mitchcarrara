@@ -13,7 +13,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        const { data: messages, error } = await supabase.from('chat_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+        const { data: messages, error } = await supabase
+            .from('chat_messages')
+            .select(
+                `
+                *,
+                user:user_id (
+                    email,
+                    raw_user_meta_data
+                )
+            `
+            )
+            .eq('conversation_id', conversationId)
+            .order('created_at', { ascending: true });
 
         if (error) {
             console.error('Error fetching messages:', error);
