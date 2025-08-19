@@ -280,6 +280,14 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
         const NUMBERCUTTER_USER_ID = '51812c6a-d469-4b9b-8f80-63c5539e79eb';
         const ASSISTANT_USER_ID = '56b738eb-780c-4e31-bd5b-4aa6b001b76a';
 
+        // Debug logging to see what's in the message
+        console.log('Message debug:', {
+            id: message.id,
+            sender: message.sender,
+            user_id: message.user_id,
+            content: message.content.substring(0, 50) + '...',
+        });
+
         if (message.sender === 'assistant') {
             return 'Assistant';
         }

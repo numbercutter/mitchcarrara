@@ -4,9 +4,12 @@ import { TablesUpdate } from '@/types/database';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { supabase } = await getDatabaseContext();
+        const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
         const { id: cardId } = await params;
+
+        console.log('Updating vision card:', cardId, 'with userId:', userId);
+        console.log('Update body:', body);
 
         const updateData: TablesUpdate<'vision_cards'> = {};
 
@@ -32,6 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
+        console.log('Successfully updated vision card:', data);
         return NextResponse.json(data);
     } catch (error) {
         console.error('Error updating vision card:', error);

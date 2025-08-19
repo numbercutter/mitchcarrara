@@ -7,6 +7,9 @@ export async function POST(request: NextRequest) {
         const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
 
+        console.log('Creating vision card with userId:', userId);
+        console.log('Request body:', body);
+
         const { data, error } = await supabase
             .from('vision_cards')
             .insert({
@@ -25,6 +28,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
+        console.log('Successfully created vision card:', data);
         revalidatePath('/dashboard/vision');
         return NextResponse.json(data);
     } catch (error) {
