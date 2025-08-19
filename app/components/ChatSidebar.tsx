@@ -276,11 +276,22 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     };
 
     const getUserDisplayName = (message: ChatMessage) => {
+        // Known user IDs
+        const NUMBERCUTTER_USER_ID = '51812c6a-d469-4b9b-8f80-63c5539e79eb';
+        const ASSISTANT_USER_ID = '56b738eb-780c-4e31-bd5b-4aa6b001b76a';
+
         if (message.sender === 'assistant') {
             return 'Assistant';
         }
 
-        return 'You';
+        // Determine based on user_id
+        if (message.user_id === NUMBERCUTTER_USER_ID) {
+            return 'Mitch';
+        } else if (message.user_id === ASSISTANT_USER_ID) {
+            return 'Assistant';
+        }
+
+        return 'User';
     };
 
     if (!isOpen) {

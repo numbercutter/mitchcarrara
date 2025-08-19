@@ -33,6 +33,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const { id: conversationId } = await params;
         const body = await request.json();
 
+        // Get the actual authenticated user ID for message attribution
+        const { getCurrentUserId } = await import('@/lib/database/server-helpers');
+        const actualUserId = await getCurrentUserId();
+
         // Verify user has access to this conversation
         const { data: conversation, error: convError } = await supabase.from('chat_conversations').select('id').eq('id', conversationId).eq('user_id', userId).single();
 
@@ -48,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 sender: body.sender || 'user',
                 message_type: body.message_type || 'text',
                 metadata: body.metadata || {},
-                user_id: userId,
+                user_id: actualUserId, // Use the actual authenticated user's ID
             })
             .select()
             .single();

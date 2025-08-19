@@ -6,6 +6,10 @@ export async function POST(request: NextRequest) {
         const { supabase, userId } = await getDatabaseContext();
         const body = await request.json();
 
+        // Get the actual authenticated user ID for message attribution
+        const { getCurrentUserId } = await import('@/lib/database/server-helpers');
+        const actualUserId = await getCurrentUserId();
+
         // Get or create today's conversation
         const today = new Date().toISOString().split('T')[0];
         const conversationTitle = `Chat - ${new Date().toLocaleDateString()}`;
@@ -43,7 +47,7 @@ export async function POST(request: NextRequest) {
                 sender: body.sender || 'user',
                 message_type: body.message_type || 'text',
                 metadata: body.metadata || {},
-                user_id: userId,
+                user_id: actualUserId, // Use the actual authenticated user's ID
             })
             .select()
             .single();
