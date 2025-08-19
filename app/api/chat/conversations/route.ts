@@ -14,8 +14,7 @@ export async function GET() {
                 created_at,
                 updated_at,
                 is_archived,
-                metadata,
-                chat_messages(count)
+                metadata
             `
             )
             .eq('user_id', userId)
@@ -27,7 +26,19 @@ export async function GET() {
             return NextResponse.json({ error: error.message }, { status: 400 });
         }
 
-        return NextResponse.json(conversations);
+        // Get message counts separately to avoid join issues
+        const conversationsWithCounts = await Promise.all(
+            (conversations || []).map(async (conv) => {
+                const { count } = await supabase.from('chat_messages').select('*', { count: 'exact', head: true }).eq('conversation_id', conv.id);
+
+                return {
+                    ...conv,
+                    messageCount: count || 0,
+                };
+            })
+        );
+
+        return NextResponse.json(conversationsWithCounts);
     } catch (error) {
         console.error('Error fetching conversations:', error);
         return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 });

@@ -10,13 +10,6 @@ interface ChatMessage {
     created_at: string;
     message_type: 'text' | 'task' | 'file' | 'system';
     user_id?: string;
-    user?: {
-        email: string;
-        raw_user_meta_data?: {
-            full_name?: string;
-            avatar_url?: string;
-        };
-    };
     metadata?: {
         taskId?: string;
         fileName?: string;
@@ -287,17 +280,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             return 'Assistant';
         }
 
-        if (message.user?.raw_user_meta_data?.full_name) {
-            return message.user.raw_user_meta_data.full_name;
-        }
-
-        if (message.user?.email) {
-            // Extract name from email (before @)
-            const emailName = message.user.email.split('@')[0];
-            return emailName.charAt(0).toUpperCase() + emailName.slice(1);
-        }
-
-        return 'User';
+        return 'You';
     };
 
     if (!isOpen) {
