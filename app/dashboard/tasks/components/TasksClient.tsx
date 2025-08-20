@@ -26,7 +26,7 @@ import { formatTimeAgo, getPriorityColor, getStatusColor } from '@/lib/database/
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import TaskModal from './TaskModal';
+// Removed TaskModal import - all task editing moved to manage page
 
 // Type helpers
 type Task = Tables<'tasks'> & {
@@ -73,8 +73,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [billingStats, setBillingStats] = useState<BillingStats | null>(initialBillingStats || null);
     const [isLoadingBillingStats, setIsLoadingBillingStats] = useState(false);
-    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    // Removed task modal state - all task editing moved to manage page
     const [isCreatingTask, setIsCreatingTask] = useState(false);
 
     const getTasksByStatus = (status: string) => {
@@ -102,60 +101,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
 
     const recentTasks = tasks.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 5);
 
-    // Toggle payment status for a task
-    const togglePaymentStatus = async (taskId: string) => {
-        try {
-            const task = tasks.find((t) => t.id === taskId);
-            if (!task) return;
-
-            const currentStatus = task.payment_status || 'unpaid';
-            let newStatus: 'paid' | 'unpaid' | 'pending';
-            let payment_date: string | null = null;
-            let payment_amount: number | null = null;
-
-            // Cycle through statuses: unpaid -> pending -> paid -> unpaid
-            if (currentStatus === 'unpaid') {
-                newStatus = 'pending';
-            } else if (currentStatus === 'pending') {
-                newStatus = 'paid';
-                payment_date = new Date().toISOString();
-                // Calculate payment amount based on estimate and $35/hour rate
-                const hours = parseHours(task.estimate);
-                payment_amount = Math.round(hours * 35 * 100) / 100;
-            } else {
-                newStatus = 'unpaid';
-                payment_date = null;
-                payment_amount = null;
-            }
-
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    payment_status: newStatus,
-                    payment_date,
-                    payment_amount,
-                }),
-            });
-
-            if (response.ok) {
-                setTasks((prev) =>
-                    prev.map((t) =>
-                        t.id === taskId
-                            ? {
-                                  ...t,
-                                  payment_status: newStatus,
-                                  payment_date,
-                                  payment_amount,
-                              }
-                            : t
-                    )
-                );
-            }
-        } catch (error) {
-            console.error('Error updating payment status:', error);
-        }
-    };
+    // Payment functionality moved to manage page
 
     // Calculate billing statistics from tasks
     const calculateBillingStats = () => {
@@ -214,18 +160,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
     const billingData = calculateBillingStats();
     const completionProgress = billingData.totalEstimatedHours > 0 ? Math.round((billingData.completedHours / billingData.totalEstimatedHours) * 100) : 0;
 
-    // Task modal functions
-    const openTaskModal = (task?: Task) => {
-        setSelectedTask(task || null);
-        setIsCreatingTask(!task);
-        setIsTaskModalOpen(true);
-    };
-
-    const closeTaskModal = () => {
-        setSelectedTask(null);
-        setIsCreatingTask(false);
-        setIsTaskModalOpen(false);
-    };
+    // Task modal functionality moved to manage page
 
     const handleSaveTask = async (taskData: Partial<Task>) => {
         try {
@@ -254,7 +189,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                     setTasks((prev) => [newTask, ...prev]);
                 }
             }
-            closeTaskModal();
+            // Modal functionality moved to manage page
         } catch (error) {
             console.error('Error saving task:', error);
         }
@@ -268,7 +203,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
 
             if (response.ok) {
                 setTasks((prev) => prev.filter((t) => t.id !== taskId));
-                closeTaskModal();
+                // Modal functionality moved to manage page
             }
         } catch (error) {
             console.error('Error deleting task:', error);
@@ -285,10 +220,12 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                         <p className='text-muted-foreground'>Statistical overview of all your tasks and productivity</p>
                     </div>
                     <div className='flex items-center gap-2'>
-                        <Button onClick={() => openTaskModal()} className='flex items-center gap-2'>
-                            <Plus className='h-4 w-4' />
-                            New Task
-                        </Button>
+                        <Link href='/dashboard/tasks/manage'>
+                            <Button className='flex items-center gap-2'>
+                                <Plus className='h-4 w-4' />
+                                New Task
+                            </Button>
+                        </Link>
                         <Link href='/dashboard/tasks/manage' className='flex items-center gap-2 rounded-md bg-secondary px-4 py-2 text-secondary-foreground hover:bg-secondary/90'>
                             <Settings className='h-4 w-4' />
                             Manage Tasks
@@ -540,7 +477,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                                     <div
                                         key={task.id}
                                         className='flex cursor-pointer flex-col gap-2 rounded-lg bg-secondary/20 p-3 transition-colors hover:bg-secondary/30'
-                                        onClick={() => openTaskModal(task)}>
+>
                                         <div className='flex items-center gap-3'>
                                             <Icon className={`h-4 w-4 ${config?.color || 'text-gray-500'}`} />
                                             <div className='min-w-0 flex-1'>
@@ -558,24 +495,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
                                             </div>
                                         </div>
 
-                                        {/* Payment Toggle Section */}
-                                        {taskHours > 0 && (
-                                            <div className='flex items-center justify-between border-t border-border/50 pt-2'>
-                                                <div className='text-xs text-muted-foreground'>
-                                                    {task.payment_amount ? `$${task.payment_amount}` : `$${(taskHours * 35).toFixed(2)} est.`}
-                                                </div>
-                                                <Button
-                                                    variant={paymentStatus === 'paid' ? 'destructive' : 'default'}
-                                                    size='sm'
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        togglePaymentStatus(task.id);
-                                                    }}
-                                                    className='h-7 px-3 text-xs'>
-                                                    {getPaymentButtonText()}
-                                                </Button>
-                                            </div>
-                                        )}
+                                        {/* Task management moved to manage page */}
                                     </div>
                                 );
                             })}
@@ -602,7 +522,7 @@ export default function TasksClient({ initialTasks, initialBillingStats }: Tasks
             </div>
 
             {/* Task Modal */}
-            <TaskModal task={selectedTask} isOpen={isTaskModalOpen} onClose={closeTaskModal} onSave={handleSaveTask} onDelete={handleDeleteTask} />
+            {/* TaskModal removed - all task editing moved to manage page */}
         </div>
     );
 }
