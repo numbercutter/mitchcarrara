@@ -81,8 +81,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             billable_hours: 0,
         }))
     );
-    const [selectedStatus, setSelectedStatus] = useState<string>('active'); // Default to active tasks only
-    const [showCompleted, setShowCompleted] = useState(false);
+    const [selectedStatus, setSelectedStatus] = useState<string>('all'); // Show all tasks by default
     const [selectedPriority, setSelectedPriority] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
@@ -350,28 +349,31 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
     };
 
     const toggleAllTasks = () => {
-        if (selectedTasks.size === activeTasks.length) {
+        if (selectedTasks.size === filteredAndSortedTasks.length) {
             setSelectedTasks(new Set());
         } else {
-            setSelectedTasks(new Set(activeTasks.map((t) => t.id)));
+            setSelectedTasks(new Set(filteredAndSortedTasks.map((t) => t.id)));
         }
     };
 
-    const allFilteredTasks = useMemo(() => {
-        return tasks.filter((task) => {
+    const filteredAndSortedTasks = useMemo(() => {
+        let filtered = tasks.filter((task) => {
             const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || task.description?.toLowerCase().includes(searchQuery.toLowerCase());
+
+            // Handle status filtering
+            let matchesStatus = true;
+            if (selectedStatus === 'active') {
+                // Active tasks: not done and not paid
+                matchesStatus = task.status !== 'done' && task.payment_status !== 'paid';
+            } else if (selectedStatus !== 'all') {
+                matchesStatus = task.status === selectedStatus;
+            }
+
             const matchesPriority = selectedPriority === 'all' || task.priority === selectedPriority;
-            return matchesSearch && matchesPriority;
-        });
-    }, [tasks, searchQuery, selectedPriority]);
-
-    const activeTasks = useMemo(() => {
-        let filtered = allFilteredTasks.filter((task) => {
-            // Active tasks: not done and not paid
-            return task.status !== 'done' && task.payment_status !== 'paid';
+            return matchesSearch && matchesStatus && matchesPriority;
         });
 
-        // Sort active tasks
+        // Sort tasks
         filtered.sort((a, b) => {
             const { field, direction } = sortConfig;
             let aValue: any, bValue: any;
@@ -412,23 +414,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         });
 
         return filtered;
-    }, [allFilteredTasks, sortConfig]);
-
-    const completedTasks = useMemo(() => {
-        return allFilteredTasks.filter((task) => {
-            // Completed tasks: done or paid
-            return task.status === 'done' || task.payment_status === 'paid';
-        }).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-    }, [allFilteredTasks]);
-
-    // Legacy for compatibility with existing code
-    const filteredAndSortedTasks = useMemo(() => {
-        if (selectedStatus === 'active') {
-            return activeTasks;
-        } else {
-            return allFilteredTasks;
-        }
-    }, [activeTasks, allFilteredTasks, selectedStatus]);
+    }, [tasks, searchQuery, selectedStatus, selectedPriority, sortConfig]);
 
     return (
         <div className='flex h-full min-h-0 flex-col'>
@@ -445,14 +431,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                             {isCompactView ? <Maximize2 className='h-4 w-4' /> : <Minimize2 className='h-4 w-4' />}
                             {isCompactView ? 'Expand' : 'Compact'}
                         </button>
-                        {completedTasks.length > 0 && (
-                            <button 
-                                onClick={() => setShowCompleted(!showCompleted)} 
-                                className='flex items-center gap-2 rounded-md border px-3 py-2 hover:bg-secondary'>
-                                <CheckSquare className='h-4 w-4' />
-                                {showCompleted ? 'Hide Completed' : `Show Completed (${completedTasks.length})`}
-                            </button>
-                        )}
+
                         <button
                             onClick={() => setShowNewTaskForm(true)}
                             className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
@@ -479,8 +458,8 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         value={selectedStatus}
                         onChange={(e) => setSelectedStatus(e.target.value)}
                         className='rounded-md border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
-                        <option value='active'>Active Tasks</option>
-                        <option value='all'>All Status</option>
+                        <option value='all'>All Tasks</option>
+                        <option value='active'>Active Only</option>
                         {Object.entries(statusConfig).map(([status, config]) => (
                             <option key={status} value={status}>
                                 {config.label}
@@ -503,25 +482,21 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
 
                 {/* Task count */}
                 <div className='mt-4 text-sm text-muted-foreground'>
-                    {activeTasks.length} active tasks
-                    {completedTasks.length > 0 && ` • ${completedTasks.length} completed`}
+                    {filteredAndSortedTasks.length} of {tasks.length} tasks
                     {selectedTasks.size > 0 && ` • ${selectedTasks.size} selected`}
                 </div>
             </div>
 
             {/* Scrollable Content */}
-            <div className='min-h-0 flex-1 overflow-y-auto pt-6 space-y-6'>
-                {/* Active Tasks Section */}
-                <div>
-                    <h2 className='text-lg font-semibold mb-4'>Active Tasks ({activeTasks.length})</h2>
-                    {activeTasks.length > 0 ? (
+            <div className='min-h-0 flex-1 overflow-y-auto pt-6'>
+                {filteredAndSortedTasks.length > 0 ? (
                     <table className='w-full'>
                         <thead className='sticky top-0 border-b bg-background/95 backdrop-blur-sm'>
                             <tr className='text-left'>
                                 <th className={`w-8 ${isCompactView ? 'p-1' : 'p-3'}`}>
                                     <input
                                         type='checkbox'
-                                        checked={selectedTasks.size === activeTasks.length && activeTasks.length > 0}
+                                        checked={selectedTasks.size === filteredAndSortedTasks.length && filteredAndSortedTasks.length > 0}
                                         onChange={toggleAllTasks}
                                         className='rounded border border-input'
                                     />
@@ -569,7 +544,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                             </tr>
                         </thead>
                         <tbody>
-                            {activeTasks.map((task) => {
+                            {filteredAndSortedTasks.map((task) => {
                                 const status = task.status || 'todo';
                                 const statusConfig_ = statusConfig[status as keyof typeof statusConfig];
                                 const priorityConfig_ = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
@@ -697,79 +672,24 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                             })}
                         </tbody>
                     </table>
-                    ) : (
-                        <div className='flex flex-1 items-center justify-center py-8'>
-                            {tasks.length === 0 ? (
-                                <div className='text-center'>
-                                    <CheckCircle2 className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                                    <h3 className='mb-2 text-lg font-semibold'>No Tasks Yet</h3>
-                                    <p className='mb-4 text-muted-foreground'>Create your first task to get started.</p>
-                                    <button onClick={() => setShowNewTaskForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                                        Create Your First Task
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className='text-center'>
-                                    <Search className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
-                                    <h3 className='mb-2 text-lg font-semibold'>All Tasks Completed</h3>
-                                    <p className='text-muted-foreground'>Great job! All your tasks are done or paid.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Completed Tasks Section */}
-                {showCompleted && completedTasks.length > 0 && (
-                    <div className='border-t pt-6'>
-                        <h2 className='text-lg font-semibold mb-4 text-muted-foreground'>Completed Tasks ({completedTasks.length})</h2>
-                        <div className='rounded-lg border bg-muted/30 p-4'>
-                            <div className='grid gap-3'>
-                                {completedTasks.map((task) => {
-                                    const status = task.status || 'todo';
-                                    const statusConfig_ = statusConfig[status as keyof typeof statusConfig];
-                                    const priorityConfig_ = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
-                                    const StatusIcon = statusConfig_?.icon || Circle;
-                                    
-                                    return (
-                                        <div key={task.id} className='flex items-center justify-between rounded-lg bg-card p-3 shadow-sm'>
-                                            <div className='flex items-center gap-3 flex-1 min-w-0'>
-                                                <StatusIcon className={`h-4 w-4 ${statusConfig_?.color || 'text-gray-500'}`} />
-                                                <div className='min-w-0 flex-1'>
-                                                    <p className='text-sm font-medium truncate'>{task.title}</p>
-                                                    <div className='flex items-center gap-2 text-xs text-muted-foreground'>
-                                                        <span>Updated {new Date(task.updated_at).toLocaleDateString()}</span>
-                                                        {task.payment_status === 'paid' && task.payment_amount && (
-                                                            <span className='text-green-600'>• Paid ${task.payment_amount}</span>
-                                                        )}
-                                                        {task.status === 'done' && <span className='text-green-600'>• Done</span>}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className='flex items-center gap-2'>
-                                                <span className={`rounded px-2 py-1 text-xs ${priorityConfig_.color}`}>{priorityConfig_.label}</span>
-                                                <div className='flex items-center gap-1'>
-                                                    <button 
-                                                        onClick={() => openTaskModal(task)} 
-                                                        className='rounded p-1 transition-colors hover:bg-secondary'
-                                                        title='View task details'>
-                                                        <Eye className='h-3 w-3' />
-                                                    </button>
-                                                    {task.payment_status !== 'paid' && (
-                                                        <button
-                                                            onClick={() => togglePaymentStatus(task.id)}
-                                                            className='rounded p-1 transition-colors hover:bg-secondary'
-                                                            title='Toggle payment status'>
-                                                            <DollarSign className='h-3 w-3' />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                ) : (
+                    <div className='flex flex-1 items-center justify-center'>
+                        {tasks.length === 0 ? (
+                            <div className='text-center'>
+                                <CheckCircle2 className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
+                                <h3 className='mb-2 text-lg font-semibold'>No Tasks Yet</h3>
+                                <p className='mb-4 text-muted-foreground'>Create your first task to get started.</p>
+                                <button onClick={() => setShowNewTaskForm(true)} className='rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                                    Create Your First Task
+                                </button>
                             </div>
-                        </div>
+                        ) : (
+                            <div className='text-center'>
+                                <Search className='mx-auto mb-4 h-12 w-12 text-muted-foreground' />
+                                <h3 className='mb-2 text-lg font-semibold'>No Tasks Found</h3>
+                                <p className='text-muted-foreground'>No tasks match your current filters.</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
