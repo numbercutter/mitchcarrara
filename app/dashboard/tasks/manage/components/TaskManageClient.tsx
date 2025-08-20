@@ -1,10 +1,38 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Plus, Filter, Search, MoreHorizontal, Circle, CheckCircle2, Clock, AlertTriangle, User, Edit3, Trash2, X, ArrowUpDown, ChevronDown, Calendar, Flag } from 'lucide-react';
+import {
+    Plus,
+    Filter,
+    Search,
+    MoreHorizontal,
+    Circle,
+    CheckCircle2,
+    Clock,
+    AlertTriangle,
+    User,
+    Edit3,
+    Trash2,
+    X,
+    ArrowUpDown,
+    ChevronDown,
+    Calendar,
+    Flag,
+    Eye,
+    DollarSign,
+    Minimize2,
+    Maximize2,
+} from 'lucide-react';
 import type { Tables } from '@/types/database';
+import TaskModal from '../../../tasks/components/TaskModal';
 
-type Task = Tables<'tasks'>;
+// Extended task type with payment fields
+type Task = Tables<'tasks'> & {
+    payment_status?: 'paid' | 'unpaid' | 'pending' | null;
+    payment_amount?: number | null;
+    payment_date?: string | null;
+    payment_notes?: string | null;
+};
 
 // Extended task type with billable hours
 interface TaskWithBilling extends Task {
@@ -52,13 +80,18 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
             billable_hours: 0,
         }))
     );
-    const [selectedStatus, setSelectedStatus] = useState<string>('all');
+    const [selectedStatus, setSelectedStatus] = useState<string>('active'); // Default to active tasks only
     const [selectedPriority, setSelectedPriority] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewTaskForm, setShowNewTaskForm] = useState(false);
     const [editingTask, setEditingTask] = useState<TaskWithBilling | null>(null);
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'updated_at', direction: 'desc' });
+
+    // New state for enhanced functionality
+    const [isCompactView, setIsCompactView] = useState(false);
+    const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
@@ -226,6 +259,77 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
         return remainingMinutes > 0 ? `${wholeHours}h ${remainingMinutes}m` : `${wholeHours}h`;
     };
 
+    // Payment status toggle functionality (from TasksClient)
+    const togglePaymentStatus = async (taskId: string) => {
+        const task = tasks.find((t) => t.id === taskId);
+        if (!task) return;
+
+        const currentStatus = task.payment_status || 'unpaid';
+        let newStatus: 'paid' | 'unpaid' | 'pending';
+        let paymentAmount: number | null = null;
+        let paymentDate: string | null = null;
+
+        // Cycle through: unpaid -> pending -> paid -> unpaid
+        switch (currentStatus) {
+            case 'unpaid':
+                newStatus = 'pending';
+                break;
+            case 'pending':
+                newStatus = 'paid';
+                paymentAmount = parseHours(task.estimate) * 35; // $35/hour
+                paymentDate = new Date().toISOString();
+                break;
+            case 'paid':
+            default:
+                newStatus = 'unpaid';
+                paymentAmount = null;
+                paymentDate = null;
+                break;
+        }
+
+        // Optimistically update UI
+        const oldTasks = tasks;
+        setTasks(tasks.map((t) => (t.id === taskId ? { ...t, payment_status: newStatus, payment_amount: paymentAmount, payment_date: paymentDate } : t)));
+
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    payment_status: newStatus,
+                    payment_amount: paymentAmount,
+                    payment_date: paymentDate,
+                }),
+            });
+
+            if (!response.ok) throw new Error('Failed to update payment status');
+        } catch (error) {
+            console.error('Error updating payment status:', error);
+            setTasks(oldTasks); // Revert on error
+        }
+    };
+
+    // Task modal functionality
+    const openTaskModal = (task: Task) => {
+        setSelectedTask(task);
+        setIsTaskModalOpen(true);
+    };
+
+    const closeTaskModal = () => {
+        setSelectedTask(null);
+        setIsTaskModalOpen(false);
+    };
+
+    const handleSaveTask = (updatedTask: Task) => {
+        setTasks((prevTasks) => prevTasks.map((task) => (task.id === updatedTask.id ? { ...task, ...updatedTask } : task)));
+        closeTaskModal();
+    };
+
+    const handleDeleteTask = async (taskId: string) => {
+        await deleteTask(taskId);
+        closeTaskModal();
+    };
+
     const handleSort = (field: SortField) => {
         const direction = sortConfig.field === field && sortConfig.direction === 'asc' ? 'desc' : 'asc';
         setSortConfig({ field, direction });
@@ -252,7 +356,16 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
     const filteredAndSortedTasks = useMemo(() => {
         let filtered = tasks.filter((task) => {
             const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchesStatus = selectedStatus === 'all' || task.status === selectedStatus;
+
+            // Handle status filtering with special "active" filter
+            let matchesStatus = true;
+            if (selectedStatus === 'active') {
+                // Active tasks: not done and not paid
+                matchesStatus = task.status !== 'done' && task.payment_status !== 'paid';
+            } else if (selectedStatus !== 'all') {
+                matchesStatus = task.status === selectedStatus;
+            }
+
             const matchesPriority = selectedPriority === 'all' || task.priority === selectedPriority;
             return matchesSearch && matchesStatus && matchesPriority;
         });
@@ -310,12 +423,18 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         <h1 className='text-3xl font-bold'>Task Management</h1>
                         <p className='text-muted-foreground'>Comprehensive task tracking and management</p>
                     </div>
-                    <button
-                        onClick={() => setShowNewTaskForm(true)}
-                        className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
-                        <Plus className='h-4 w-4' />
-                        New Task
-                    </button>
+                    <div className='flex items-center gap-2'>
+                        <button onClick={() => setIsCompactView(!isCompactView)} className='flex items-center gap-2 rounded-md border px-3 py-2 hover:bg-secondary'>
+                            {isCompactView ? <Maximize2 className='h-4 w-4' /> : <Minimize2 className='h-4 w-4' />}
+                            {isCompactView ? 'Expand' : 'Compact'}
+                        </button>
+                        <button
+                            onClick={() => setShowNewTaskForm(true)}
+                            className='flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90'>
+                            <Plus className='h-4 w-4' />
+                            New Task
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filters and Search */}
@@ -335,6 +454,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                         value={selectedStatus}
                         onChange={(e) => setSelectedStatus(e.target.value)}
                         className='rounded-md border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'>
+                        <option value='active'>Active Tasks</option>
                         <option value='all'>All Status</option>
                         {Object.entries(statusConfig).map(([status, config]) => (
                             <option key={status} value={status}>
@@ -369,7 +489,7 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                     <table className='w-full'>
                         <thead className='sticky top-0 border-b bg-background/95 backdrop-blur-sm'>
                             <tr className='text-left'>
-                                <th className='w-8 p-3'>
+                                <th className={`w-8 ${isCompactView ? 'p-1' : 'p-3'}`}>
                                     <input
                                         type='checkbox'
                                         checked={selectedTasks.size === filteredAndSortedTasks.length && filteredAndSortedTasks.length > 0}
@@ -377,39 +497,46 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                         className='rounded border border-input'
                                     />
                                 </th>
-                                <th className='min-w-[300px] p-3'>
+                                <th className={`min-w-[300px] ${isCompactView ? 'p-1' : 'p-3'}`}>
                                     <button onClick={() => handleSort('title')} className='flex items-center gap-1 font-medium hover:text-primary'>
                                         Task
                                         <ArrowUpDown className='h-3 w-3' />
                                     </button>
                                 </th>
-                                <th className='w-32 p-3'>
+                                <th className={`w-32 ${isCompactView ? 'p-1' : 'p-3'}`}>
                                     <button onClick={() => handleSort('status')} className='flex items-center gap-1 font-medium hover:text-primary'>
                                         Status
                                         <ArrowUpDown className='h-3 w-3' />
                                     </button>
                                 </th>
-                                <th className='w-24 p-3'>
-                                    <button onClick={() => handleSort('priority')} className='flex items-center gap-1 font-medium hover:text-primary'>
-                                        Priority
-                                        <ArrowUpDown className='h-3 w-3' />
-                                    </button>
-                                </th>
-                                <th className='w-24 p-3'>Assignee</th>
-                                <th className='w-32 p-3'>
-                                    <button onClick={() => handleSort('due_date')} className='flex items-center gap-1 font-medium hover:text-primary'>
-                                        Due Date
-                                        <ArrowUpDown className='h-3 w-3' />
-                                    </button>
-                                </th>
-                                <th className='w-24 p-3'>Estimate</th>
-                                <th className='w-32 p-3'>
-                                    <button onClick={() => handleSort('updated_at')} className='flex items-center gap-1 font-medium hover:text-primary'>
-                                        Updated
-                                        <ArrowUpDown className='h-3 w-3' />
-                                    </button>
-                                </th>
-                                <th className='w-16 p-3'>Actions</th>
+                                {!isCompactView && (
+                                    <th className='w-24 p-3'>
+                                        <button onClick={() => handleSort('priority')} className='flex items-center gap-1 font-medium hover:text-primary'>
+                                            Priority
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                )}
+                                {!isCompactView && <th className='w-24 p-3'>Assignee</th>}
+                                {!isCompactView && (
+                                    <th className='w-32 p-3'>
+                                        <button onClick={() => handleSort('due_date')} className='flex items-center gap-1 font-medium hover:text-primary'>
+                                            Due Date
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                )}
+                                {!isCompactView && <th className='w-24 p-3'>Estimate</th>}
+                                <th className={`w-24 ${isCompactView ? 'p-1' : 'p-3'}`}>Payment</th>
+                                {!isCompactView && (
+                                    <th className='w-32 p-3'>
+                                        <button onClick={() => handleSort('updated_at')} className='flex items-center gap-1 font-medium hover:text-primary'>
+                                            Updated
+                                            <ArrowUpDown className='h-3 w-3' />
+                                        </button>
+                                    </th>
+                                )}
+                                <th className={`w-20 ${isCompactView ? 'p-1' : 'p-3'}`}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -421,15 +548,17 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                 const isSelected = selectedTasks.has(task.id);
 
                                 return (
-                                    <tr key={task.id} className={`border-b transition-colors hover:bg-secondary/20 ${isSelected ? 'bg-primary/5' : ''}`}>
-                                        <td className='p-3'>
+                                    <tr
+                                        key={task.id}
+                                        className={`border-b transition-colors hover:bg-secondary/20 ${isSelected ? 'bg-primary/5' : ''} ${isCompactView ? 'h-12' : ''}`}>
+                                        <td className={isCompactView ? 'p-1' : 'p-3'}>
                                             <input type='checkbox' checked={isSelected} onChange={() => toggleTaskSelection(task.id)} className='rounded border border-input' />
                                         </td>
-                                        <td className='p-3'>
-                                            <div className='space-y-1'>
-                                                <div className='text-sm font-medium'>{task.title}</div>
-                                                {task.description && <div className='line-clamp-2 text-xs text-muted-foreground'>{task.description}</div>}
-                                                {task.labels && task.labels.length > 0 && (
+                                        <td className={isCompactView ? 'p-1' : 'p-3'}>
+                                            <div className={`space-y-1 ${isCompactView ? 'space-y-0' : ''}`}>
+                                                <div className={`${isCompactView ? 'text-xs' : 'text-sm'} truncate font-medium`}>{task.title}</div>
+                                                {!isCompactView && task.description && <div className='line-clamp-2 text-xs text-muted-foreground'>{task.description}</div>}
+                                                {!isCompactView && task.labels && task.labels.length > 0 && (
                                                     <div className='mt-1 flex flex-wrap gap-1'>
                                                         {task.labels.slice(0, 3).map((label, index) => (
                                                             <span key={index} className='rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary'>
@@ -441,49 +570,95 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                                                 )}
                                             </div>
                                         </td>
-                                        <td className='p-3'>
+                                        <td className={isCompactView ? 'p-1' : 'p-3'}>
                                             <div className='flex items-center gap-2'>
                                                 <StatusIcon className={`h-3 w-3 ${statusConfig_?.color}`} />
-                                                <span className='text-sm'>{statusConfig_?.label}</span>
+                                                {!isCompactView && <span className='text-sm'>{statusConfig_?.label}</span>}
                                             </div>
                                         </td>
-                                        <td className='p-3'>
-                                            <span className={`rounded-full px-2 py-1 text-xs ${priorityConfig_.color}`}>{priorityConfig_.label}</span>
-                                        </td>
-                                        <td className='p-3'>
-                                            <div className='flex items-center gap-2'>
-                                                <User className='h-3 w-3 text-muted-foreground' />
-                                                <span className='text-sm capitalize'>{task.assignee}</span>
-                                            </div>
-                                        </td>
-                                        <td className='p-3'>
-                                            {task.due_date ? (
+                                        {!isCompactView && (
+                                            <td className='p-3'>
+                                                <span className={`rounded-full px-2 py-1 text-xs ${priorityConfig_.color}`}>{priorityConfig_.label}</span>
+                                            </td>
+                                        )}
+                                        {!isCompactView && (
+                                            <td className='p-3'>
                                                 <div className='flex items-center gap-2'>
-                                                    <Calendar className='h-3 w-3 text-muted-foreground' />
-                                                    <span className='text-sm'>{parseLocalDate(task.due_date).toLocaleDateString()}</span>
+                                                    <User className='h-3 w-3 text-muted-foreground' />
+                                                    <span className='text-sm capitalize'>{task.assignee}</span>
                                                 </div>
-                                            ) : (
-                                                <span className='text-sm text-muted-foreground'>No date</span>
-                                            )}
-                                        </td>
-                                        <td className='p-3'>
-                                            <div className='text-sm'>
-                                                {task.estimate ? (
-                                                    <span className='font-medium text-muted-foreground'>{formatHours(parseHours(task.estimate))}</span>
+                                            </td>
+                                        )}
+                                        {!isCompactView && (
+                                            <td className='p-3'>
+                                                {task.due_date ? (
+                                                    <div className='flex items-center gap-2'>
+                                                        <Calendar className='h-3 w-3 text-muted-foreground' />
+                                                        <span className='text-sm'>{parseLocalDate(task.due_date).toLocaleDateString()}</span>
+                                                    </div>
                                                 ) : (
-                                                    <span className='text-muted-foreground'>No estimate</span>
+                                                    <span className='text-sm text-muted-foreground'>No date</span>
                                                 )}
-                                            </div>
+                                            </td>
+                                        )}
+                                        {!isCompactView && (
+                                            <td className='p-3'>
+                                                <div className='text-sm'>
+                                                    {task.estimate ? (
+                                                        <span className='font-medium text-muted-foreground'>{formatHours(parseHours(task.estimate))}</span>
+                                                    ) : (
+                                                        <span className='text-muted-foreground'>No estimate</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                        <td className={isCompactView ? 'p-1' : 'p-3'}>
+                                            <button
+                                                onClick={() => togglePaymentStatus(task.id)}
+                                                className={`rounded ${isCompactView ? 'px-1 py-0.5' : 'px-2 py-1'} text-xs font-medium transition-colors ${
+                                                    task.payment_status === 'paid'
+                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/20 dark:text-green-300'
+                                                        : task.payment_status === 'pending'
+                                                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300'
+                                                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300'
+                                                }`}>
+                                                {isCompactView
+                                                    ? task.payment_status === 'paid'
+                                                        ? 'P'
+                                                        : task.payment_status === 'pending'
+                                                          ? '~'
+                                                          : 'U'
+                                                    : task.payment_status === 'paid'
+                                                      ? 'Paid'
+                                                      : task.payment_status === 'pending'
+                                                        ? 'Pending'
+                                                        : 'Unpaid'}
+                                                {!isCompactView && task.payment_status === 'paid' && task.payment_amount && (
+                                                    <div className='text-xs opacity-70'>${task.payment_amount}</div>
+                                                )}
+                                            </button>
                                         </td>
-                                        <td className='p-3'>
-                                            <span className='text-sm text-muted-foreground'>{new Date(task.updated_at).toLocaleDateString()}</span>
-                                        </td>
-                                        <td className='p-3'>
-                                            <div className='flex items-center gap-1'>
-                                                <button onClick={() => openEditForm(task)} className='rounded p-1.5 transition-colors hover:bg-secondary'>
+                                        {!isCompactView && (
+                                            <td className='p-3'>
+                                                <span className='text-sm text-muted-foreground'>{new Date(task.updated_at).toLocaleDateString()}</span>
+                                            </td>
+                                        )}
+                                        <td className={isCompactView ? 'p-1' : 'p-3'}>
+                                            <div className={`flex items-center ${isCompactView ? 'gap-0.5' : 'gap-1'}`}>
+                                                <button
+                                                    onClick={() => openTaskModal(task)}
+                                                    className={`rounded ${isCompactView ? 'p-1' : 'p-1.5'} transition-colors hover:bg-secondary`}
+                                                    title='View task details'>
+                                                    <Eye className='h-3 w-3' />
+                                                </button>
+                                                <button
+                                                    onClick={() => openEditForm(task)}
+                                                    className={`rounded ${isCompactView ? 'p-1' : 'p-1.5'} transition-colors hover:bg-secondary`}>
                                                     <Edit3 className='h-3 w-3' />
                                                 </button>
-                                                <button onClick={() => deleteTask(task.id)} className='rounded p-1.5 text-destructive transition-colors hover:bg-secondary'>
+                                                <button
+                                                    onClick={() => deleteTask(task.id)}
+                                                    className={`rounded ${isCompactView ? 'p-1' : 'p-1.5'} text-destructive transition-colors hover:bg-secondary`}>
                                                     <Trash2 className='h-3 w-3' />
                                                 </button>
                                             </div>
@@ -651,6 +826,9 @@ export default function TaskManageClient({ initialTasks }: TaskManageClientProps
                     </div>
                 </div>
             )}
+
+            {/* Task Modal */}
+            <TaskModal task={selectedTask} isOpen={isTaskModalOpen} onClose={closeTaskModal} onSave={handleSaveTask} onDelete={handleDeleteTask} />
         </div>
     );
 }

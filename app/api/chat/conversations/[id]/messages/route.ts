@@ -13,7 +13,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        const { data: messages, error } = await supabase.from('chat_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+        const { data: messages, error } = await supabase
+            .from('chat_messages')
+            .select(
+                `
+                *,
+                user:user_id (
+                    email,
+                    raw_user_meta_data
+                )
+            `
+            )
+            .eq('conversation_id', conversationId)
+            .order('created_at', { ascending: true });
 
         if (error) {
             console.error('Error fetching messages:', error);
@@ -33,10 +45,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const { id: conversationId } = await params;
         const body = await request.json();
 
-        // Get the actual authenticated user ID for message attribution
-        const { getCurrentUserId } = await import('@/lib/database/server-helpers');
-        const actualUserId = await getCurrentUserId();
-
         // Verify user has access to this conversation
         const { data: conversation, error: convError } = await supabase.from('chat_conversations').select('id').eq('id', conversationId).eq('user_id', userId).single();
 
@@ -52,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                 sender: body.sender || 'user',
                 message_type: body.message_type || 'text',
                 metadata: body.metadata || {},
-                user_id: actualUserId, // Use the actual authenticated user's ID
+                user_id: userId,
             })
             .select()
             .single();

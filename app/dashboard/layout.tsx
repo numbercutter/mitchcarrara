@@ -62,6 +62,7 @@ const navigation = [
             { name: 'Overview', href: '/dashboard/tasks', icon: LayoutDashboard },
             { name: 'Manage Tasks', href: '/dashboard/tasks/manage', icon: CheckSquare },
             { name: 'Calendar', href: '/dashboard/tasks/calendar', icon: Calendar },
+            { name: 'Done', href: '/dashboard/tasks/done', icon: CheckSquare },
         ],
     },
     {
