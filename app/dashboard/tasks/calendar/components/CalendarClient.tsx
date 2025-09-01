@@ -641,8 +641,8 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                                     <label className='mb-2 block text-sm font-medium'>Start Date & Time</label>
                                     <input
                                         type='datetime-local'
-                                        value={eventForm.start_datetime.slice(0, 16)}
-                                        onChange={(e) => setEventForm((prev) => ({ ...prev, start_datetime: e.target.value + ':00.000Z' }))}
+                                        value={eventForm.start_datetime ? new Date(eventForm.start_datetime).toISOString().slice(0, 16) : ''}
+                                        onChange={(e) => setEventForm((prev) => ({ ...prev, start_datetime: new Date(e.target.value).toISOString() }))}
                                         className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
                                     />
                                 </div>
@@ -650,8 +650,8 @@ export default function CalendarClient({ initialEvents, initialTasks, initialCon
                                     <label className='mb-2 block text-sm font-medium'>End Date & Time *</label>
                                     <input
                                         type='datetime-local'
-                                        value={eventForm.end_datetime.slice(0, 16)}
-                                        onChange={(e) => setEventForm((prev) => ({ ...prev, end_datetime: e.target.value + ':00.000Z' }))}
+                                        value={eventForm.end_datetime ? new Date(eventForm.end_datetime).toISOString().slice(0, 16) : ''}
+                                        onChange={(e) => setEventForm((prev) => ({ ...prev, end_datetime: new Date(e.target.value).toISOString() }))}
                                         className='w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary'
                                         required
                                     />

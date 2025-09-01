@@ -56,7 +56,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
     // Fetch conversations from database
     const fetchConversations = async () => {
         try {
-            const response = await fetch('/api/chat/conversations');
+            const response = await fetch('/api/chat/conversations', {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
             if (response.ok) {
                 const conversations = await response.json();
                 setThreads(conversations);
@@ -65,6 +70,8 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
                 if (!currentThreadId && conversations.length > 0) {
                     setCurrentThreadId(conversations[0].id);
                 }
+            } else {
+                console.error('Failed to fetch conversations:', response.status, response.statusText);
             }
         } catch (error) {
             console.error('Error fetching conversations:', error);
@@ -77,7 +84,12 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
         try {
             setIsLoading(true);
-            const response = await fetch(`/api/chat/conversations/${threadId}/messages`);
+            const response = await fetch(`/api/chat/conversations/${threadId}/messages`, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
             if (response.ok) {
                 const newMessages = await response.json();
 
@@ -88,6 +100,8 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
 
                 lastMessageCountRef.current = newMessages.length;
                 setMessages(newMessages);
+            } else {
+                console.error('Failed to fetch messages:', response.status, response.statusText);
             }
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -102,6 +116,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             const title = `Chat - ${new Date().toLocaleDateString()}`;
             const response = await fetch('/api/chat/conversations', {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title }),
             });
@@ -225,6 +240,7 @@ export default function ChatSidebar({ isOpen, onToggle }: ChatSidebarProps) {
             // Send message via API
             const response = await fetch(`/api/chat/conversations/${threadId}/messages`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     content: messageContent,
