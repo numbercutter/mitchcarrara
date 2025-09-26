@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
 
         // Validate that weights sum to 1.0 (within a small tolerance)
-        const weightSum = Object.values(body).reduce((sum: number, weight: any) => sum + (typeof weight === 'number' ? weight : 0), 0);
+        const weightSum = (Object.values(body) as any[]).reduce((sum: number, weight: any) => sum + (typeof weight === 'number' ? weight : 0), 0);
 
         if (Math.abs(weightSum - 1.0) > 0.01) {
             return NextResponse.json({ error: 'Weights must sum to 1.0' }, { status: 400 });

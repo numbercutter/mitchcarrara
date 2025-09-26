@@ -74,7 +74,7 @@ export default function WeightsConfig({ initialWeights, onWeightsChange, lifeAre
     };
 
     // Calculate total weight
-    const totalWeight = Object.values(weights).reduce((sum: number, weight: any) => sum + (typeof weight === 'number' ? weight : 0), 0);
+    const totalWeight = (Object.values(weights) as any[]).reduce((sum: number, weight: any) => sum + (typeof weight === 'number' ? weight : 0), 0);
     const isValidTotal = Math.abs(totalWeight - 1.0) < 0.01;
 
     return (
