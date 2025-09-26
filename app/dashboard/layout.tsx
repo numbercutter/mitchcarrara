@@ -28,6 +28,7 @@ import {
     LogOut,
     DollarSign,
     StickyNote,
+    Target,
 } from 'lucide-react';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import { CompanySelector } from '../components/CompanySelector';
@@ -40,6 +41,7 @@ import UserContextIndicator from './components/UserContextIndicator';
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Vision Board', href: '/dashboard/vision', icon: Eye },
+    { name: 'Life Auditor', href: '/dashboard/life-auditor', icon: Target },
     { name: 'Notes', href: '/dashboard/notes', icon: StickyNote },
     {
         name: 'Personal',
@@ -81,7 +83,7 @@ const navigation = [
 // Simplified navigation for mobile bottom bar (main sections only)
 const mobileNavigation = [
     { name: 'Home', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Notes', href: '/dashboard/notes', icon: StickyNote },
+    { name: 'Auditor', href: '/dashboard/life-auditor', icon: Target },
     { name: 'Personal', href: '/dashboard/personal', icon: Heart },
     { name: 'Tasks', href: '/dashboard/tasks', icon: CheckSquare },
     { name: 'More', href: '/dashboard/companies', icon: Building2 },
